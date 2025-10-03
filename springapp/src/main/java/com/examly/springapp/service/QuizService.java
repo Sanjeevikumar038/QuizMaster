@@ -3,6 +3,7 @@ import com.examly.springapp.dto.QuizDTO;
 import com.examly.springapp.exception.ResourceNotFoundException;
 import com.examly.springapp.model.Quiz;
 import com.examly.springapp.repository.QuizRepository;
+// import com.examly.springapp.repository.QuizAttemptRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.Date;
@@ -48,6 +49,14 @@ throw new ResourceNotFoundException("Quiz not found");
 }
 quizRepository.deleteById(id);
 }
+// @Autowired
+// private QuizAttemptRepository quizAttemptRepository;
+
+public boolean hasStudentTakenQuiz(Long quizId, String studentName) {
+    // return quizAttemptRepository.existsByQuizIdAndStudentName(quizId, studentName);
+    return false; // Disabled for compilation
+}
+
 private QuizDTO convertToDTO(Quiz quiz) {
 QuizDTO quizDTO = new QuizDTO();
 quizDTO.setId(quiz.getId());

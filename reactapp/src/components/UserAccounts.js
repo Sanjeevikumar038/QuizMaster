@@ -11,78 +11,44 @@ const UserAccounts = () => {
     fetchUsers();
   }, []);
 
-  useEffect(() => {
-    // Update user statuses from localStorage
-    const userStatuses = JSON.parse(localStorage.getItem('userStatuses') || '{}');
-    setUsers(prevUsers => 
-      prevUsers.map(user => ({
-        ...user,
-        active: userStatuses[user.name]?.active !== undefined ? userStatuses[user.name].active : user.active
-      })).filter(user => !userStatuses[user.name]?.deleted)
-    );
-  }, []);
+
 
   const fetchUsers = async () => {
     try {
-      const savedStudents = localStorage.getItem('students');
-      const studentUsers = savedStudents ? JSON.parse(savedStudents).map((student, index) => ({
-        id: index + 1,
+      const response = await fetch('http://localhost:8080/api/students');
+      const students = await response.json();
+      
+      const studentUsers = students.map(student => ({
+        id: student.id,
         name: student.username,
-        email: student.email || 'N/A',
+        email: student.email,
         role: 'student',
         active: true,
-        joinedDate: new Date().toISOString().split('T')[0]
-      })) : [];
+        joinedDate: new Date(student.createdAt).toISOString().split('T')[0]
+      }));
       
       setUsers(studentUsers);
       setLoading(false);
     } catch (err) {
+      console.error('Error fetching students:', err);
       setLoading(false);
     }
   };
+  
+  // Listen for new user registrations
+  useEffect(() => {
+    const handleUserRegistered = () => {
+      fetchUsers();
+    };
+    window.addEventListener('userRegistered', handleUserRegistered);
+    return () => {
+      window.removeEventListener('userRegistered', handleUserRegistered);
+    };
+  }, []);
 
   const addUser = (e) => {
     e.preventDefault();
-    
-    // Check for duplicate username
-    const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
-    if (savedStudents.find(s => s.username === newUser.name)) {
-      alert('Username already exists');
-      return;
-    }
-    
-    // Check for duplicate email
-    if (savedStudents.find(s => s.email === newUser.email)) {
-      alert('Email already exists');
-      return;
-    }
-    
-    // Validate password length
-    if (newUser.password.length < 6) {
-      alert('Password must be at least 6 characters');
-      return;
-    }
-    
-    // Add to students list for login
-    const newStudent = {
-      username: newUser.name,
-      email: newUser.email,
-      password: newUser.password
-    };
-    const updatedStudents = [...savedStudents, newStudent];
-    localStorage.setItem('students', JSON.stringify(updatedStudents));
-    
-    // Add to users display
-    const user = {
-      id: Date.now(),
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      active: true,
-      joinedDate: new Date().toISOString().split('T')[0]
-    };
-    setUsers([...users, user]);
-    setNewUser({ name: '', email: '', password: '', role: 'student' });
+    alert('User registration should be done through the signup page');
     setShowAddForm(false);
   };
 
@@ -91,31 +57,18 @@ const UserAccounts = () => {
       user.id === userId ? {...user, active: !user.active} : user
     );
     setUsers(updatedUsers);
-    
-    // Update localStorage with user status
-    const userStatuses = JSON.parse(localStorage.getItem('userStatuses') || '{}');
-    const targetUser = updatedUsers.find(u => u.id === userId);
-    if (targetUser) {
-      userStatuses[targetUser.name] = { active: targetUser.active, deleted: false };
-      localStorage.setItem('userStatuses', JSON.stringify(userStatuses));
-    }
   };
 
-  const deleteUser = (userId) => {
+  const deleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user? They will not be able to login or signup again.')) {
-      const targetUser = users.find(u => u.id === userId);
-      setUsers(users.filter(user => user.id !== userId));
-      
-      // Mark user as deleted in localStorage
-      const userStatuses = JSON.parse(localStorage.getItem('userStatuses') || '{}');
-      if (targetUser) {
-        userStatuses[targetUser.name] = { active: false, deleted: true };
-        localStorage.setItem('userStatuses', JSON.stringify(userStatuses));
-        
-        // Remove from students list
-        const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
-        const updatedStudents = savedStudents.filter(s => s.username !== targetUser.name);
-        localStorage.setItem('students', JSON.stringify(updatedStudents));
+      try {
+        await fetch(`http://localhost:8080/api/students/${userId}`, {
+          method: 'DELETE'
+        });
+        setUsers(users.filter(user => user.id !== userId));
+      } catch (err) {
+        console.error('Error deleting student:', err);
+        alert('Failed to delete student');
       }
     }
   };

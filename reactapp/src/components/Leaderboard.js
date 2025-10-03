@@ -9,16 +9,40 @@ const Leaderboard = ({ onBack }) => {
   const [selectedQuiz, setSelectedQuiz] = useState('all');
   const [availableQuizzes, setAvailableQuizzes] = useState([]);
 
-  const loadLeaderboardData = useCallback(() => {
+  const loadLeaderboardData = useCallback(async () => {
     try {
-      const attempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
+      // Fetch quiz attempts from database
+      const response = await fetch('http://localhost:8080/api/quiz-attempts');
+      const attempts = await response.json();
+      console.log('Leaderboard - All attempts:', attempts);
+      
+      // Fetch quiz details and create attempts with quiz titles
+      const attemptsWithTitles = await Promise.all(
+        attempts.map(async (attempt) => {
+          try {
+            const quizResponse = await fetch(`http://localhost:8080/api/quizzes/${attempt.quiz.id}`);
+            const quiz = await quizResponse.json();
+            return {
+              ...attempt,
+              quizTitle: quiz.title,
+              score: (attempt.score / attempt.totalQuestions) * 100
+            };
+          } catch (err) {
+            return {
+              ...attempt,
+              quizTitle: 'Unknown Quiz',
+              score: (attempt.score / attempt.totalQuestions) * 100
+            };
+          }
+        })
+      );
       
       // Get unique quiz titles for filter dropdown
-      const uniqueQuizzes = [...new Set(attempts.map(attempt => attempt.quizTitle))];
+      const uniqueQuizzes = [...new Set(attemptsWithTitles.map(attempt => attempt.quizTitle))];
       setAvailableQuizzes(uniqueQuizzes);
       
       // Filter attempts by selected quiz if not 'all'
-      const filteredAttempts = selectedQuiz === 'all' ? attempts : attempts.filter(attempt => attempt.quizTitle === selectedQuiz);
+      const filteredAttempts = selectedQuiz === 'all' ? attemptsWithTitles : attemptsWithTitles.filter(attempt => attempt.quizTitle === selectedQuiz);
       
       // Group attempts by student and calculate average scores
       const studentStats = {};
@@ -65,6 +89,17 @@ const Leaderboard = ({ onBack }) => {
 
   useEffect(() => {
     loadLeaderboardData();
+  }, [loadLeaderboardData]);
+  
+  // Listen for quiz submission events
+  useEffect(() => {
+    const handleQuizSubmitted = () => {
+      loadLeaderboardData();
+    };
+    window.addEventListener('quizSubmitted', handleQuizSubmitted);
+    return () => {
+      window.removeEventListener('quizSubmitted', handleQuizSubmitted);
+    };
   }, [loadLeaderboardData]);
 
   const getRankIcon = (rank) => {

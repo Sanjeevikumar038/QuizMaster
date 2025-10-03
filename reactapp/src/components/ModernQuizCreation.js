@@ -16,11 +16,43 @@ const ModernQuizCreation = ({ onQuizCreated }) => {
   useEffect(() => {
     loadAvailableQuestions();
   }, []);
+  
+  // Listen for question updates
+  useEffect(() => {
+    const handleQuestionsUpdated = () => {
+      loadAvailableQuestions();
+    };
+    window.addEventListener('questionsUpdated', handleQuestionsUpdated);
+    return () => {
+      window.removeEventListener('questionsUpdated', handleQuestionsUpdated);
+    };
+  }, []);
 
-  const loadAvailableQuestions = () => {
+  const loadAvailableQuestions = async () => {
     try {
-      const questions = JSON.parse(localStorage.getItem('questions') || '[]');
-      setAvailableQuestions(questions);
+      const allQuestions = [];
+      
+      // Fetch all quizzes and their questions from database
+      const response = await fetch('http://localhost:8080/api/quizzes');
+      const apiQuizzes = await response.json();
+      
+      for (const quiz of apiQuizzes) {
+        try {
+          const qResponse = await fetch(`http://localhost:8080/api/quizzes/${quiz.id}/questions`);
+          const questions = await qResponse.json();
+          questions.forEach(q => {
+            allQuestions.push({
+              ...q,
+              quizId: quiz.id,
+              quizTitle: quiz.title
+            });
+          });
+        } catch (err) {
+          console.log('Failed to fetch questions for quiz:', quiz.id);
+        }
+      }
+      
+      setAvailableQuestions(allQuestions);
     } catch (error) {
       console.error('Error loading questions:', error);
     }
@@ -60,23 +92,56 @@ const ModernQuizCreation = ({ onQuizCreated }) => {
         selectedQuestions.includes(q.id)
       );
 
-      const newQuiz = {
-        id: Date.now(),
-        ...quiz,
-        questions: selectedQuestionObjects,
-        createdAt: new Date().toISOString()
+      // Create quiz in database
+      const quizData = {
+        title: quiz.title,
+        description: quiz.description,
+        timeLimit: quiz.duration
       };
-
-      const existingQuizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-      const updatedQuizzes = [...existingQuizzes, newQuiz];
-      localStorage.setItem('quizzes', JSON.stringify(updatedQuizzes));
-
-      setMessage('Quiz created successfully!');
-      setQuiz({ title: '', description: '', duration: 30, questions: [] });
-      setSelectedQuestions([]);
       
-      if (onQuizCreated) {
-        onQuizCreated();
+      const response = await fetch('http://localhost:8080/api/quizzes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(quizData)
+      });
+      
+      if (response.ok) {
+        const newQuiz = await response.json();
+        
+        // Add selected questions to the quiz
+        for (const questionId of selectedQuestions) {
+          const question = availableQuestions.find(q => q.id === questionId);
+          if (question) {
+            const questionData = {
+              questionText: question.questionText,
+              questionType: question.questionType,
+              options: question.options
+            };
+            
+            await fetch(`http://localhost:8080/api/quizzes/${newQuiz.id}/questions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(questionData)
+            });
+          }
+        }
+        
+        setMessage('Quiz created successfully!');
+        setQuiz({ title: '', description: '', duration: 30, questions: [] });
+        setSelectedQuestions([]);
+        
+        // Notify other components that quizzes were updated
+        window.dispatchEvent(new Event('quizzesUpdated'));
+        
+        if (onQuizCreated) {
+          onQuizCreated();
+        }
+      } else {
+        throw new Error('Failed to create quiz');
       }
     } catch (error) {
       setMessage('Error creating quiz. Please try again.');

@@ -101,43 +101,42 @@ const EnhancedAdminDashboard = ({
 
   const loadAdminData = async () => {
     try {
-      const quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-      const students = JSON.parse(localStorage.getItem('students') || '[]');
-      const attempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
-      const deletedQuestions = JSON.parse(localStorage.getItem('deletedQuestions') || '[]');
-
-      console.log('Loading admin data:', { quizzes, students, attempts, deletedQuestions });
-
-      // Count questions from localStorage first, then API as fallback
+      const BASE_URL = 'http://localhost:8080';
+      
+      // Fetch from database APIs
+      const [quizzesRes, studentsRes] = await Promise.all([
+        axios.get(`${BASE_URL}/api/quizzes`),
+        axios.get(`${BASE_URL}/api/students`)
+      ]);
+      
+      const quizzes = quizzesRes.data;
+      const students = studentsRes.data;
+      
+      // Try to fetch attempts, fallback to empty array if endpoint doesn't exist
+      let attempts = [];
+      try {
+        const attemptsRes = await axios.get(`${BASE_URL}/api/quiz-attempts`);
+        attempts = attemptsRes.data;
+      } catch (err) {
+        console.log('Quiz attempts endpoint not available');
+      }
+      
+      // Count questions from API
       let totalQuestions = 0;
-      
-      // First count localStorage questions
-      quizzes.forEach(quiz => {
-        if (quiz.questions) {
-          const activeQuestions = quiz.questions.filter(q => !deletedQuestions.includes(q.id));
-          totalQuestions += activeQuestions.length;
-        }
-      });
-      
-      // If no localStorage questions, try API
-      if (totalQuestions === 0) {
-        for (const quiz of quizzes) {
-          try {
-            const BASE_URL = 'http://localhost:8080';
-            const questionsResponse = await axios.get(`${BASE_URL}/api/quizzes/${quiz.id}/questions`);
-            const activeApiQuestions = questionsResponse.data.filter(q => !deletedQuestions.includes(q.id));
-            totalQuestions += activeApiQuestions.length;
-          } catch (qErr) {
-            console.log(`Failed to fetch questions for quiz ${quiz.id}`);
-          }
+      for (const quiz of quizzes) {
+        try {
+          const questionsResponse = await axios.get(`${BASE_URL}/api/quizzes/${quiz.id}/questions`);
+          totalQuestions += questionsResponse.data.length;
+        } catch (qErr) {
+          console.log(`Failed to fetch questions for quiz ${quiz.id}`);
         }
       }
-
+      
       // Get recent activity (last 10 attempts)
-      const recentActivity = attempts
+      const recentActivity = Array.isArray(attempts) ? attempts
         .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
-        .slice(0, 10);
-
+        .slice(0, 10) : [];
+      
       const newStats = {
         totalQuizzes: quizzes.length,
         totalQuestions,
@@ -145,8 +144,7 @@ const EnhancedAdminDashboard = ({
         totalAttempts: attempts.length,
         recentActivity
       };
-
-      console.log('New admin stats:', newStats);
+      
       setAdminStats(newStats);
       setLoading(false);
     } catch (error) {

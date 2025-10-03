@@ -12,13 +12,24 @@ const Login = ({ onLogin }) => {
   const [adminError, setAdminError] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
 
-  // Load students from localStorage on component mount
+  // Load students from database on component mount
   useEffect(() => {
-    const savedStudents = localStorage.getItem('students');
-    if (savedStudents) {
-      setStudents(JSON.parse(savedStudents));
+    fetchStudents();
+  }, []);
+  
+  const fetchStudents = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/students');
+      const studentsData = await response.json();
+      console.log('Fetched students from database:', studentsData);
+      setStudents(studentsData);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      setStudents([]);
     }
-    
+  };
+  
+  useEffect(() => {
     // Listen for admin modal open event from navbar
     const handleOpenAdminModal = () => {
       setShowAdminModal(true);
@@ -31,11 +42,7 @@ const Login = ({ onLogin }) => {
     };
   }, []);
 
-  // Save students to localStorage
-  const saveStudents = (studentList) => {
-    localStorage.setItem('students', JSON.stringify(studentList));
-    setStudents(studentList);
-  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,17 +67,15 @@ const Login = ({ onLogin }) => {
         return;
       }
       
-      // Check if username is deleted or deactivated
-      const userStatuses = JSON.parse(localStorage.getItem('userStatuses') || '{}');
-      const userStatus = userStatuses[credentials.username];
-      
-      if (userStatus?.deleted) {
+      // Check if username is deleted or deactivated from database
+      const existingStudent = students.find(s => s.username === credentials.username);
+      if (existingStudent?.deleted) {
         setError('This username has been permanently deleted. Please contact administrator.');
         setIsLoading(false);
         return;
       }
       
-      if (userStatus?.active === false) {
+      if (existingStudent?.active === false) {
         setError('This username has been deactivated. Please contact administrator.');
         setIsLoading(false);
         return;
@@ -88,38 +93,98 @@ const Login = ({ onLogin }) => {
         return;
       }
       
-      const newStudent = { username: credentials.username, password: credentials.password, email: credentials.email };
-      const updatedStudents = [...students, newStudent];
-      saveStudents(updatedStudents);
-      localStorage.setItem('username', credentials.username);
-      console.log('Signup: Saved username to localStorage:', credentials.username);
-      setIsLoading(false);
-      onLogin();
+      // Create student in database
+      try {
+        const response = await fetch('http://localhost:8080/api/students', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            username: credentials.username,
+            email: credentials.email,
+            password: credentials.password
+          })
+        });
+        
+        if (response.ok) {
+          const newStudent = await response.json();
+          console.log('Signup: Created user in database:', newStudent);
+          
+          // Notify other components that a new user was registered
+          window.dispatchEvent(new Event('userRegistered'));
+          
+          // Create session in database
+          const sessionResponse = await fetch('http://localhost:8080/api/sessions/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: credentials.username, userRole: 'student' })
+          });
+          
+          if (sessionResponse.ok) {
+            const session = await sessionResponse.json();
+            localStorage.setItem('sessionToken', session.sessionToken);
+            localStorage.setItem('username', credentials.username);
+            setIsLoading(false);
+            onLogin();
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('Signup failed:', response.status, errorText);
+          setError(`Failed to create account. Please check if username or email already exists.`);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Signup error:', error);
+        setError('Network error. Please check your connection and try again.');
+        setIsLoading(false);
+      }
     } else {
-      // Student login - check user status first
-      const userStatuses = JSON.parse(localStorage.getItem('userStatuses') || '{}');
-      const userStatus = userStatuses[credentials.username];
+      // Check credentials against database
+      console.log('Login attempt for username:', credentials.username);
+      console.log('Available students:', students);
+      const student = students.find(s => s.username === credentials.username);
+      console.log('Found student:', student);
+      if (!student) {
+        setError('Invalid credentials - User not found in database');
+        setIsLoading(false);
+        return;
+      }
       
-      if (userStatus?.deleted) {
+      // Validate password
+      if (student.password !== credentials.password) {
+        setError('Invalid credentials - Incorrect password');
+        setIsLoading(false);
+        return;
+      }
+      
+      if (student.deleted) {
         setError('This account has been deleted. Please contact administrator.');
         setIsLoading(false);
         return;
       }
       
-      if (userStatus?.active === false) {
+      if (student.active === false) {
         setError('This account has been deactivated. Please contact administrator.');
         setIsLoading(false);
         return;
       }
       
-      const student = students.find(s => s.username === credentials.username && s.password === credentials.password);
-      if (student) {
+      // Create session in database
+      const sessionResponse = await fetch('http://localhost:8080/api/sessions/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: credentials.username, userRole: 'student' })
+      });
+      
+      if (sessionResponse.ok) {
+        const session = await sessionResponse.json();
+        localStorage.setItem('sessionToken', session.sessionToken);
         localStorage.setItem('username', credentials.username);
-        console.log('Login: Saved username to localStorage:', credentials.username);
         setIsLoading(false);
         onLogin();
       } else {
-        setError('Invalid credentials');
+        setError('Failed to create session');
         setIsLoading(false);
       }
     }
@@ -133,11 +198,22 @@ const Login = ({ onLogin }) => {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     if (adminCredentials.username === 'admin' && adminCredentials.password === 'admin123') {
-      localStorage.setItem('username', 'admin');
-      localStorage.setItem('userRole', 'admin');
-      setAdminLoading(false);
-      setShowAdminModal(false);
-      onLogin('admin');
+      // Create admin session in database
+      const sessionResponse = await fetch('http://localhost:8080/api/sessions/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', userRole: 'admin' })
+      });
+      
+      if (sessionResponse.ok) {
+        const session = await sessionResponse.json();
+        localStorage.setItem('sessionToken', session.sessionToken);
+        localStorage.setItem('username', 'admin');
+        localStorage.setItem('userRole', 'admin');
+        setAdminLoading(false);
+        setShowAdminModal(false);
+        onLogin('admin');
+      }
     } else {
       setAdminError('Invalid admin credentials');
       setAdminLoading(false);

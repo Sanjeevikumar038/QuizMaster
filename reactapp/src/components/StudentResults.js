@@ -7,63 +7,80 @@ const StudentResults = ({ studentId = 'current-student' }) => {
 
   const fetchResults = useCallback(async () => {
     try {
-      let studentResults = [];
-      const currentStudentName = localStorage.getItem('username') || localStorage.getItem('studentName') || 'Student';
-      console.log('Looking for results for student:', currentStudentName);
-      console.log('Current localStorage quizResults:', localStorage.getItem('quizResults'));
+      const currentStudentName = localStorage.getItem('username') || 'Student';
+      console.log('Fetching results for student:', currentStudentName);
       
-      // Use localStorage directly since server is not running
-      console.log('Using localStorage data directly');
+      // Fetch quiz attempts from database
+      const response = await fetch('http://localhost:8080/api/quiz-attempts');
+      const allAttempts = await response.json();
+      console.log('StudentResults - All attempts:', allAttempts);
       
-      const quizResults = JSON.parse(localStorage.getItem('quizResults') || '[]');
-      const quizAttempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
+      // Filter attempts for current student
+      const studentAttempts = allAttempts.filter(attempt => 
+        attempt.studentName === currentStudentName
+      );
+      console.log('StudentResults - Filtered attempts for', currentStudentName, ':', studentAttempts);
       
-      console.log('=== DEBUGGING TIMING DATA ===');
-      console.log('quizResults:', quizResults);
-      console.log('quizAttempts:', quizAttempts);
-      console.log('Current student name for filtering:', currentStudentName);
+      // Fetch quiz details for each attempt
+      const studentResults = await Promise.all(
+        studentAttempts.map(async (attempt) => {
+          try {
+            const quizId = attempt.quizId || attempt.quiz?.id;
+            const quizResponse = await fetch(`http://localhost:8080/api/quizzes/${quizId}`);
+            const quiz = await quizResponse.json();
+            
+            // Format time taken
+            let timeTaken = 'N/A';
+            if (attempt.timeTaken) {
+              const minutes = Math.floor(attempt.timeTaken / 60);
+              const seconds = attempt.timeTaken % 60;
+              timeTaken = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            return {
+              id: attempt.id,
+              quizTitle: attempt.quizTitle || quiz.title,
+              studentName: attempt.studentName,
+              score: attempt.score,
+              correctAnswers: attempt.score,
+              totalQuestions: attempt.totalQuestions,
+              completedAt: attempt.completedAt,
+              timeTaken: timeTaken
+            };
+          } catch (err) {
+            console.error('Error fetching quiz details:', err);
+            
+            // Format time taken for fallback
+            let timeTaken = 'N/A';
+            if (attempt.timeTaken) {
+              const minutes = Math.floor(attempt.timeTaken / 60);
+              const seconds = attempt.timeTaken % 60;
+              timeTaken = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            return {
+              id: attempt.id,
+              quizTitle: attempt.quizTitle || 'Quiz',
+              studentName: attempt.studentName,
+              score: attempt.score,
+              correctAnswers: attempt.score,
+              totalQuestions: attempt.totalQuestions,
+              completedAt: attempt.completedAt,
+              timeTaken: timeTaken
+            };
+          }
+        })
+      );
       
-      // Check each quizResult for timing data
-      quizResults.forEach((result, index) => {
-        console.log(`QuizResult ${index}:`, {
-          studentName: result.studentName,
-          quizTitle: result.quizTitle,
-          timeTaken: result.timeTaken,
-          hasTimeTaken: !!result.timeTaken
-        });
-      });
-      
-      // Use quizResults directly - it has the actual timeTaken data
-      studentResults = quizResults.filter(result => {
-        console.log(`QuizResults entry:`, result);
-        console.log(`Timing data: ${result.timeTaken}`);
-        return result.studentName === currentStudentName;
-      });
-      
-      console.log('Final studentResults with timing:', studentResults);
-      
-      // Enhance results with missing data but keep original timeTaken
-      studentResults = studentResults.map(result => {
-        const savedQuizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-        const quiz = savedQuizzes.find(q => q.id === result.quizId);
-        return {
-          ...result,
-          quizTitle: result.quizTitle || quiz?.title || 'Quiz',
-          correctAnswers: result.correctAnswers || result.score
-        };
-      });
-      
-      console.log('Enhanced localStorage results:', studentResults);
-      
-      // Sort results by completedAt date (latest first)
+      // Sort by completion date (latest first)
       const sortedResults = studentResults.sort((a, b) => 
         new Date(b.completedAt) - new Date(a.completedAt)
       );
-      console.log('Setting results in state:', sortedResults);
+      
       setResults(sortedResults);
       setLoading(false);
     } catch (err) {
-      console.log('Overall fetch error:', err);
+      console.error('Error fetching results from database:', err);
       setResults([]);
       setLoading(false);
     }
@@ -71,6 +88,18 @@ const StudentResults = ({ studentId = 'current-student' }) => {
 
   useEffect(() => {
     fetchResults();
+    
+    // Listen for quiz submission events
+    const handleQuizSubmitted = () => {
+      console.log('Quiz submitted event received, refreshing results...');
+      fetchResults();
+    };
+    
+    window.addEventListener('quizSubmitted', handleQuizSubmitted);
+    
+    return () => {
+      window.removeEventListener('quizSubmitted', handleQuizSubmitted);
+    };
   }, [fetchResults]);
 
   if (loading) return (
@@ -166,10 +195,10 @@ const StudentResults = ({ studentId = 'current-student' }) => {
             </thead>
             <tbody>
               {results.map((result, index) => {
-                // Fix score calculation - result.score is number of correct answers, not percentage
-                const correctAnswers = result.correctAnswers || result.score || 0;
+                // result.score is the number of correct answers from database
+                const correctAnswers = result.score || 0;
                 const totalQuestions = result.totalQuestions || 1;
-                const percentage = (correctAnswers / totalQuestions) * 100;
+                const percentage = Math.round((correctAnswers / totalQuestions) * 100);
                 const getScoreColor = (score) => {
                   if (score >= 80) return { bg: '#dcfce7', text: '#065f46' };
                   if (score >= 60) return { bg: '#fef3c7', text: '#92400e' };

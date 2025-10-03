@@ -25,43 +25,38 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) throws Exception {
         if (quizRepository.count() == 0) {
             // Create sample quiz
-            Quiz quiz = Quiz.builder()
-                    .title("Java Basics Quiz")
-                    .description("Test your knowledge of Java fundamentals")
-                    .timeLimit(30)
-                    .createdAt(new Date())
-                    .updatedAt(new Date())
-                    .build();
+            Quiz quiz = new Quiz();
+            quiz.setTitle("Java Basics Quiz");
+            quiz.setDescription("Test your knowledge of Java fundamentals");
+            quiz.setTimeLimit(30);
+            quiz.setCreatedAt(new Date());
+            quiz.setUpdatedAt(new Date());
             
             quiz = quizRepository.save(quiz);
             
             // Create sample question
-            Question question = Question.builder()
-                    .quiz(quiz)
-                    .questionText("What is the main method signature in Java?")
-                    .questionType("multiple-choice")
-                    .build();
+            Question question = new Question();
+            question.setQuiz(quiz);
+            question.setQuestionText("What is the main method signature in Java?");
+            question.setQuestionType("multiple-choice");
             
             question = questionRepository.save(question);
             
             // Create options
-            Option option1 = Option.builder()
-                    .question(question)
-                    .optionText("public static void main(String[] args)")
-                    .isCorrect(true)
-                    .build();
+            Option option1 = new Option();
+            option1.setQuestion(question);
+            option1.setOptionText("public static void main(String[] args)");
+            option1.setIsCorrect(true);
             
-            Option option2 = Option.builder()
-                    .question(question)
-                    .optionText("public void main(String[] args)")
-                    .isCorrect(false)
-                    .build();
+            Option option2 = new Option();
+            option2.setQuestion(question);
+            option2.setOptionText("public void main(String[] args)");
+            option2.setIsCorrect(false);
             
-            Option option3 = Option.builder()
-                    .question(question)
-                    .optionText("static void main(String[] args)")
-                    .isCorrect(false)
-                    .build();
+            Option option3 = new Option();
+            option3.setQuestion(question);
+            option3.setOptionText("static void main(String[] args)");
+            option3.setIsCorrect(false);
             
             optionRepository.saveAll(Arrays.asList(option1, option2, option3));
             

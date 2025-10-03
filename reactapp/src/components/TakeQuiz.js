@@ -115,24 +115,9 @@ const TakeQuiz = ({ quizId, onQuizCompleted }) => {
                 setQuiz(quizResponse.data);
                 const questionsResponse = await axios.get(`http://localhost:8080/api/quizzes/${quizId}/questions`);
                 
-                // Get edited and deleted questions from localStorage
-                const editedQuestions = JSON.parse(localStorage.getItem('editedQuestions') || '{}');
-                const deletedQuestions = JSON.parse(localStorage.getItem('deletedQuestions') || '[]');
-                console.log('Edited questions available:', editedQuestions);
-                console.log('Deleted questions:', deletedQuestions);
-                
-                // Filter out deleted questions and use edited versions if available
-                const finalQuestions = questionsResponse.data
-                    .filter(q => !deletedQuestions.includes(q.id)) // Remove deleted questions
-                    .map(q => {
-                        if (editedQuestions[q.id]) {
-                            console.log('Using edited version for question:', q.id);
-                            return editedQuestions[q.id];
-                        }
-                        return q;
-                    });
-                
-                console.log('Final questions for quiz (after filtering deleted):', finalQuestions);
+                // Use questions directly from database
+                const finalQuestions = questionsResponse.data;
+                console.log('Questions loaded from database:', finalQuestions);
                 
                 // Shuffle questions for each student
                 const shuffledQuestions = shuffleQuestions(finalQuestions);
@@ -207,34 +192,33 @@ return selectedOption?.isCorrect === true;
 
 console.log('Correct answers count:', correctAnswers);
 
-const score = Math.round((correctAnswers / questions.length) * 100);
+// const score = Math.round((correctAnswers / questions.length) * 100);
 const timeTakenSeconds = Math.floor((Date.now() - startTime) / 1000);
 const timeTakenFormatted = `${Math.floor(timeTakenSeconds / 60)}:${(timeTakenSeconds % 60).toString().padStart(2, '0')}`;
 
-// Create result object
+// Create result object for fallback (with correct score format)
 const quizResult = {
 id: Date.now(),
 quizTitle: quiz.title,
 studentName: studentName,
-score: score,
+score: correctAnswers, // Use number of correct answers, not percentage
 correctAnswers: correctAnswers,
 totalQuestions: questions.length,
 completedAt: new Date().toISOString(),
 timeTaken: timeTakenFormatted
 };
 
-// Always save to localStorage for local display
-const existingResults = JSON.parse(localStorage.getItem('quizResults') || '[]');
-existingResults.push(quizResult);
-localStorage.setItem('quizResults', JSON.stringify(existingResults));
+// Save quiz attempt to database
+const quizAttemptData = {
+  quizId: quiz.id,
+  quizTitle: quiz.title,
+  studentName: studentName,
+  score: correctAnswers,
+  totalQuestions: questions.length,
+  timeTaken: timeTakenSeconds
+};
 
-// Also save to quizAttempts for admin dashboard
-const existingAttempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
-existingAttempts.push(quizResult);
-localStorage.setItem('quizAttempts', JSON.stringify(existingAttempts));
-
-// CRITICAL: Clear retake permission and saved progress
-localStorage.setItem('retakePermissions', '[]');
+// Clear saved progress
 const saveKey = `quiz_progress_${quiz.id}_${studentName}`;
 localStorage.removeItem(saveKey);
 
@@ -242,7 +226,7 @@ localStorage.removeItem(saveKey);
 window.dispatchEvent(new Event('quizSubmitted'));
 window.dispatchEvent(new Event('retakePermissionUpdated'));
 
-console.log('Saved to localStorage. All results:', existingResults);
+console.log('Submitting to database:', quizAttemptData);
 
 // Mark quiz as completed to prevent fullscreen re-entry
 setQuizCompleted(true);
@@ -252,14 +236,51 @@ await exitFullscreen();
 
 // Small delay to ensure fullscreen exit completes
 setTimeout(() => {
-// Try API as well
-axios.post(`http://localhost:8080/api/quiz-attempts`, submission)
-.then(result => {
+// Submit to database API
+axios.post(`http://localhost:8080/api/quiz-attempts`, quizAttemptData)
+.then(async (result) => {
 console.log('Quiz submission successful:', result.data);
+console.log('Response status:', result.status);
+
+// Send result email to student
+try {
+  // Get student email from database
+  const studentsResponse = await fetch('http://localhost:8080/api/students');
+  const students = await studentsResponse.json();
+  const currentStudent = students.find(s => s.username === studentName);
+  
+  if (currentStudent && currentStudent.email) {
+    // Import and use EmailService
+    const { default: emailService } = await import('./EmailService');
+    
+    const emailResult = await emailService.sendQuizResults(
+      currentStudent.email,
+      quiz,
+      {
+        score: correctAnswers,
+        totalQuestions: questions.length,
+        timeTaken: timeTakenFormatted
+      }
+    );
+    
+    console.log('Email sent result:', emailResult);
+  } else {
+    console.log('No email found for student:', studentName);
+  }
+} catch (emailError) {
+  console.error('Failed to send result email:', emailError);
+}
+
+// Force refresh of all components
+window.dispatchEvent(new Event('quizSubmitted'));
 onQuizCompleted(result.data);
 })
 .catch(apiErr => {
-console.log('API failed, but localStorage saved:', apiErr);
+console.error('API submission failed:', apiErr);
+console.error('Error details:', apiErr.response?.data);
+console.error('Error status:', apiErr.response?.status);
+// Still dispatch event even if API fails
+window.dispatchEvent(new Event('quizSubmitted'));
 onQuizCompleted(quizResult);
 });
 }, 300);

@@ -33,9 +33,10 @@ class EmailService {
 
   // Send quiz reminder email
   async sendQuizReminder(studentEmail, quizData) {
+    const studentName = await this.getStudentName(studentEmail);
     const templateParams = {
       to_email: studentEmail,
-      student_name: this.getStudentName(studentEmail),
+      student_name: studentName,
       quiz_title: quizData.title,
       quiz_description: quizData.description,
       time_limit: quizData.timeLimit,
@@ -50,10 +51,11 @@ class EmailService {
   async sendQuizResults(studentEmail, quizData, results) {
     const percentage = Math.round((results.score / results.totalQuestions) * 100);
     const grade = this.calculateGrade(percentage);
+    const studentName = await this.getStudentName(studentEmail);
 
     const templateParams = {
       to_email: studentEmail,
-      student_name: this.getStudentName(studentEmail),
+      student_name: studentName,
       quiz_title: quizData.title,
       score: results.score,
       total_questions: results.totalQuestions,
@@ -68,11 +70,22 @@ class EmailService {
 
   // Send new quiz notification to all students
   async sendNewQuizNotification(quizData) {
-    const students = JSON.parse(localStorage.getItem('students') || '[]');
-    const studentsWithEmail = students.filter(student => student.email);
+    let studentsWithEmail = [];
     
-    if (studentsWithEmail.length === 0) {
-      console.log('No students with email addresses found');
+    try {
+      // Fetch students from database instead of localStorage
+      const response = await fetch('http://localhost:8080/api/students');
+      const students = await response.json();
+      studentsWithEmail = students.filter(student => student.email);
+      
+      console.log('Found students with emails:', studentsWithEmail);
+      
+      if (studentsWithEmail.length === 0) {
+        console.log('No students with email addresses found');
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching students from database:', error);
       return [];
     }
     
@@ -121,10 +134,16 @@ class EmailService {
   }
 
   // Helper methods
-  getStudentName(email) {
-    const students = JSON.parse(localStorage.getItem('students') || '[]');
-    const student = students.find(s => s.email === email || `${s.username}@example.com` === email);
-    return student ? student.username : email.split('@')[0];
+  async getStudentName(email) {
+    try {
+      const response = await fetch('http://localhost:8080/api/students');
+      const students = await response.json();
+      const student = students.find(s => s.email === email || `${s.username}@example.com` === email);
+      return student ? student.username : email.split('@')[0];
+    } catch (error) {
+      console.error('Error fetching student name:', error);
+      return email.split('@')[0];
+    }
   }
 
   calculateGrade(percentage) {

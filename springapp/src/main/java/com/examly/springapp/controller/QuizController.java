@@ -37,4 +37,10 @@ public class QuizController {
         quizService.deleteQuiz(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
+    
+    @GetMapping("/{quizId}/attempts/{studentName}")
+    public ResponseEntity<Boolean> hasStudentTakenQuiz(@PathVariable Long quizId, @PathVariable String studentName) {
+        boolean hasTaken = quizService.hasStudentTakenQuiz(quizId, studentName);
+        return ResponseEntity.ok(hasTaken);
+    }
 }

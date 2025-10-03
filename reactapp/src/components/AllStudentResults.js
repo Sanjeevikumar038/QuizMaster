@@ -5,84 +5,144 @@ const AllStudentResults = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sortBy, setSortBy] = useState('date');
-  const [quizzes, setQuizzes] = useState([]);
+  // const [quizzes, setQuizzes] = useState([]);
 
-  const isRetakeAllowed = (studentName, quizTitle) => {
-    const retakePermissions = JSON.parse(localStorage.getItem('retakePermissions') || '[]');
+  const [retakePermissions, setRetakePermissions] = useState([]);
+  
+  const isRetakeAllowed = (studentName, quizId, quizTitle) => {
     return retakePermissions.some(permission => 
-      permission.studentName === studentName && permission.quizTitle === quizTitle
+      permission.studentName === studentName && 
+      (permission.quizId === quizId || permission.quizTitle === quizTitle) &&
+      permission.active === true
     );
   };
 
-  const handleAllowRetake = (studentName, quizTitle) => {
-    const retakePermissions = JSON.parse(localStorage.getItem('retakePermissions') || '[]');
-    const permission = {
-      studentName,
-      quizTitle,
-      allowedAt: new Date().toISOString()
-    };
-    retakePermissions.push(permission);
-    localStorage.setItem('retakePermissions', JSON.stringify(retakePermissions));
-    window.dispatchEvent(new Event('retakePermissionUpdated'));
-    setResults([...results]); // Force re-render
-    alert(`${studentName} is now allowed to retake "${quizTitle}"`);
+  const handleAllowRetake = async (studentName, quizId, quizTitle) => {
+    try {
+      const response = await fetch('http://localhost:8080/api/retake-permissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          studentName, 
+          quizId, 
+          quizTitle 
+        })
+      });
+      
+      if (response.ok) {
+        const newPermission = await response.json();
+        setRetakePermissions([...retakePermissions, newPermission]);
+        window.dispatchEvent(new Event('retakePermissionUpdated'));
+        alert(`${studentName} is now allowed to retake "${quizTitle}"`);
+      }
+    } catch (err) {
+      console.error('Error allowing retake:', err);
+    }
   };
 
   useEffect(() => {
-    // Load quizzes for title lookup
-    const savedQuizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-    setQuizzes(savedQuizzes);
     fetchAllResults();
+    fetchRetakePermissions();
   }, []);
+  
+  // Listen for quiz submission events
+  useEffect(() => {
+    const handleQuizSubmitted = () => {
+      fetchAllResults();
+    };
+    window.addEventListener('quizSubmitted', handleQuizSubmitted);
+    return () => {
+      window.removeEventListener('quizSubmitted', handleQuizSubmitted);
+    };
+  }, []);
+  
+  const fetchRetakePermissions = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/retake-permissions');
+      const permissions = await response.json();
+      setRetakePermissions(permissions);
+    } catch (err) {
+      console.error('Error fetching retake permissions:', err);
+    }
+  };
 
   const fetchAllResults = async () => {
     try {
-      let allResults = [];
+      // Fetch quiz attempts from database
+      const response = await fetch('http://localhost:8080/api/quiz-attempts');
+      const allAttempts = await response.json();
       
-      // Use localStorage directly since server is not running
-      console.log('Using localStorage data directly for admin results');
+      // Fetch quiz details for each attempt
+      const allResults = await Promise.all(
+        allAttempts.map(async (attempt) => {
+          try {
+            const quizId = attempt.quizId || attempt.quiz?.id;
+            let quizTitle = attempt.quizTitle || 'Quiz';
+            
+            if (quizId && !attempt.quizTitle) {
+              try {
+                const quizResponse = await fetch(`http://localhost:8080/api/quizzes/${quizId}`);
+                const quiz = await quizResponse.json();
+                quizTitle = quiz.title;
+              } catch (err) {
+                console.error('Error fetching quiz details:', err);
+              }
+            }
+            
+            // Format time taken
+            let timeTaken = 'N/A';
+            if (attempt.timeTaken) {
+              const minutes = Math.floor(attempt.timeTaken / 60);
+              const seconds = attempt.timeTaken % 60;
+              timeTaken = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            return {
+              id: attempt.id,
+              quizId: quizId,
+              quizTitle: quizTitle,
+              studentName: attempt.studentName,
+              score: (attempt.score / attempt.totalQuestions) * 100,
+              correctAnswers: attempt.score,
+              totalQuestions: attempt.totalQuestions,
+              completedAt: attempt.completedAt,
+              timeTaken: timeTaken
+            };
+          } catch (err) {
+            console.error('Error fetching quiz details:', err);
+            
+            // Format time taken for fallback
+            let timeTaken = 'N/A';
+            if (attempt.timeTaken) {
+              const minutes = Math.floor(attempt.timeTaken / 60);
+              const seconds = attempt.timeTaken % 60;
+              timeTaken = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            return {
+              id: attempt.id,
+              quizId: attempt.quizId,
+              quizTitle: attempt.quizTitle || 'Quiz',
+              studentName: attempt.studentName,
+              score: (attempt.score / attempt.totalQuestions) * 100,
+              correctAnswers: attempt.score,
+              totalQuestions: attempt.totalQuestions,
+              completedAt: attempt.completedAt,
+              timeTaken: timeTaken
+            };
+          }
+        })
+      );
       
-      const quizResults = JSON.parse(localStorage.getItem('quizResults') || '[]');
-      const quizAttempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
-      const savedQuizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
+      // Remove duplicates based on unique combination of id, studentName, and quizTitle
+      const uniqueResults = allResults.filter((result, index, self) => 
+        index === self.findIndex(r => r.id === result.id && r.studentName === result.studentName && r.quizTitle === result.quizTitle)
+      );
       
-      console.log('=== ADMIN DEBUGGING TIMING DATA ===');
-      console.log('QuizResults data (with actual timing):', quizResults);
-      console.log('QuizAttempts data (no timing):', quizAttempts);
-      console.log('QuizResults length:', quizResults.length);
-      console.log('QuizAttempts length:', quizAttempts.length);
-      
-      // Force use of quizResults data which has timing
-      console.log('Forcing use of quizResults data');
-      
-      // Use quizResults directly - it has the timing data
-      allResults = quizResults.map(result => {
-        console.log('Using result with timing:', result.timeTaken);
-        return {
-          ...result,
-          correctAnswers: result.correctAnswers || result.score
-        };
-      });
-      
-      // If no quizResults, create mock data with timing
-      if (allResults.length === 0) {
-        console.log('No quizResults, creating from quizAttempts with mock timing');
-        allResults = quizAttempts.map(result => {
-          const quiz = savedQuizzes.find(q => q.id === result.quizId);
-          return {
-            ...result,
-            quizTitle: quiz?.title || 'Unknown Quiz',
-            timeTaken: `${Math.floor(Math.random() * 3) + 1}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-            correctAnswers: result.correctAnswers || result.score
-          };
-        });
-      }
-      
-      console.log('Final admin results with timing:', allResults);
-      
-      setResults(allResults);
+      setResults(uniqueResults);
       setLoading(false);
     } catch (err) {
+      console.error('Error fetching results from database:', err);
       setError('Failed to fetch student results');
       setLoading(false);
     }
@@ -274,7 +334,7 @@ const AllStudentResults = () => {
                 console.log('Rendering result:', result);
                 
                 return (
-                  <tr key={result.id} style={{
+                  <tr key={`${result.id}-${result.studentName}-${index}`} style={{
                     backgroundColor: index % 2 === 0 ? '#f8fafc' : 'white',
                     borderBottom: '1px solid #e5e7eb'
                   }}>
@@ -309,7 +369,7 @@ const AllStudentResults = () => {
                         fontWeight: '500',
                         display: 'inline-block'
                       }}>
-                        {result.quizTitle || quizzes.find(q => q.id === result.quizId)?.title || 'Unknown Quiz'}
+                        {result.quizTitle || 'Unknown Quiz'}
                       </div>
                     </td>
                     <td style={{
@@ -373,7 +433,7 @@ const AllStudentResults = () => {
                       textAlign: 'center',
                       verticalAlign: 'middle'
                     }}>
-                      {isRetakeAllowed(result.studentName, result.quizTitle) ? (
+                      {isRetakeAllowed(result.studentName, result.quizId, result.quizTitle) ? (
                         <button
                           style={{
                             backgroundColor: '#6b7280',
@@ -391,7 +451,7 @@ const AllStudentResults = () => {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleAllowRetake(result.studentName, result.quizTitle)}
+                          onClick={() => handleAllowRetake(result.studentName, result.quizId, result.quizTitle)}
                           style={{
                             backgroundColor: '#10b981',
                             color: 'white',

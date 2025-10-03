@@ -14,10 +14,7 @@ const QuestionBank = () => {
 
   const loadQuestions = async () => {
     const allQuestions = [];
-    const deletedQuestions = JSON.parse(localStorage.getItem('deletedQuestions') || '[]');
-    const editedQuestions = JSON.parse(localStorage.getItem('editedQuestions') || '{}');
     
-    // Load API questions
     try {
       const response = await fetch('http://localhost:8080/api/quizzes');
       const apiQuizzes = await response.json();
@@ -27,58 +24,39 @@ const QuestionBank = () => {
           const qResponse = await fetch(`http://localhost:8080/api/quizzes/${quiz.id}/questions`);
           const questions = await qResponse.json();
           questions.forEach(q => {
-            // Skip deleted questions
-            if (!deletedQuestions.includes(q.id)) {
-              // Use edited version if available, otherwise use original
-              const questionToAdd = editedQuestions[q.id] ? {
-                ...editedQuestions[q.id],
-                source: 'edited'
-              } : {
-                ...q,
-                quizId: quiz.id,
-                quizTitle: quiz.title,
-                source: 'api'
-              };
-              
-              allQuestions.push(questionToAdd);
-            }
+            allQuestions.push({
+              ...q,
+              quizId: quiz.id,
+              quizTitle: quiz.title,
+              source: 'database'
+            });
           });
         } catch (err) {
           console.log('Failed to fetch questions for quiz:', quiz.id);
         }
       }
-
     } catch (err) {
-
+      console.error('Error loading questions:', err);
     }
     
     setQuestions(allQuestions);
     setLoading(false);
   };
 
-  const deleteQuestion = (questionId) => {
+  const deleteQuestion = async (questionId) => {
     if (!window.confirm('Are you sure you want to delete this question?')) return;
     
-    // Mark as deleted
-    const deletedQuestions = JSON.parse(localStorage.getItem('deletedQuestions') || '[]');
-    if (!deletedQuestions.includes(questionId)) {
-      deletedQuestions.push(questionId);
-      localStorage.setItem('deletedQuestions', JSON.stringify(deletedQuestions));
+    try {
+      await fetch(`http://localhost:8080/api/questions/${questionId}`, {
+        method: 'DELETE'
+      });
+      
+      setQuestions(questions.filter(q => q.id !== questionId));
+      window.dispatchEvent(new Event('questionsUpdated'));
+    } catch (err) {
+      console.error('Error deleting question:', err);
+      alert('Failed to delete question');
     }
-    
-    // Remove from edited questions if it exists
-    const editedQuestions = JSON.parse(localStorage.getItem('editedQuestions') || '{}');
-    if (editedQuestions[questionId]) {
-      delete editedQuestions[questionId];
-      localStorage.setItem('editedQuestions', JSON.stringify(editedQuestions));
-    }
-    
-
-    
-    setQuestions(questions.filter(q => q.id !== questionId));
-    
-    // Trigger dashboard refresh
-    window.dispatchEvent(new Event('questionsUpdated'));
   };
 
   const startEdit = (question) => {
@@ -89,29 +67,37 @@ const QuestionBank = () => {
     });
   };
 
-  const saveEdit = (questionId) => {
+  const saveEdit = async (questionId) => {
     const question = questions.find(q => q.id === questionId);
     const updatedQuestion = {
-      id: question.id,
       questionText: editForm.questionText,
       questionType: question.questionType,
-      options: editForm.options,
-      quizId: question.quizId,
-      quizTitle: question.quizTitle
+      options: editForm.options
     };
     
-    // Save edited questions separately for easy retrieval
-    const editedQuestions = JSON.parse(localStorage.getItem('editedQuestions') || '{}');
-    editedQuestions[questionId] = updatedQuestion;
-    localStorage.setItem('editedQuestions', JSON.stringify(editedQuestions));
-    
-    // Update the questions state immediately
-    setQuestions(questions.map(q => q.id === questionId ? { ...updatedQuestion, source: 'edited' } : q));
-    setEditingQuestion(null);
-    setEditForm({});
-    
-    // Trigger dashboard refresh
-    window.dispatchEvent(new Event('questionsUpdated'));
+    try {
+      await fetch(`http://localhost:8080/api/questions/${questionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updatedQuestion)
+      });
+      
+      // Update the questions state immediately
+      setQuestions(questions.map(q => q.id === questionId ? { 
+        ...q, 
+        questionText: editForm.questionText,
+        options: editForm.options,
+        source: 'database' 
+      } : q));
+      setEditingQuestion(null);
+      setEditForm({});
+      window.dispatchEvent(new Event('questionsUpdated'));
+    } catch (err) {
+      console.error('Error updating question:', err);
+      alert('Failed to update question');
+    }
   };
 
   const updateEditForm = (field, value) => {

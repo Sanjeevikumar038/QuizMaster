@@ -41,7 +41,7 @@ const QuizResults = ({ attempt, onReturnHome }) => {
         );
     }
 
-    const percentage = (attempt.score / attempt.totalQuestions) * 100;
+    const percentage = Math.round((attempt.score / attempt.totalQuestions) * 100);
     const isPassed = percentage >= 60;
 
     return (
@@ -177,7 +177,7 @@ const QuizResults = ({ attempt, onReturnHome }) => {
                         color: isPassed ? '#065f46' : '#dc2626',
                         marginBottom: '0.5rem'
                     }}>
-                        {percentage.toFixed(1)}%
+                        {percentage}%
                     </div>
                     <div style={{
                         color: isPassed ? '#065f46' : '#dc2626',

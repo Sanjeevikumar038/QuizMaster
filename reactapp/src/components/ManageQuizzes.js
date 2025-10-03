@@ -42,6 +42,8 @@ const ManageQuizzes = () => {
     try {
       await axios.delete(`http://localhost:8080/api/quizzes/${quizId}`);
       setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
+      // Notify other components that quizzes were updated
+      window.dispatchEvent(new Event('quizzesUpdated'));
     } catch (err) {
       setError(handleApiError(err, 'Failed to delete quiz'));
     }

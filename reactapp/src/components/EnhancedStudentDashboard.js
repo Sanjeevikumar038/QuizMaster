@@ -17,17 +17,20 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
   
   // Check if student has already taken this quiz
   const hasStudentTakenQuiz = (quiz) => {
-    const attempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
-    return attempts.some(attempt => 
-      attempt.quizTitle === quiz.title && attempt.studentName === studentName
+    return studentStats.recentAttempts.some(attempt => 
+      (attempt.quiz?.id || attempt.quizId) === quiz.id
     );
   };
 
+  const [retakePermissions, setRetakePermissions] = useState([]);
+  
   // Check if student has retake permission
   const hasRetakePermission = (quiz) => {
-    const permissions = JSON.parse(localStorage.getItem('retakePermissions') || '[]');
-    return permissions.some(permission => 
-      permission.quizTitle === quiz.title && permission.studentName === studentName
+    return retakePermissions.some(permission => 
+      ((permission.quizId === quiz.id) || 
+       (permission.quizId === null && permission.quizTitle === quiz.title)) && 
+      permission.studentName === studentName && 
+      permission.active === true
     );
   };
 
@@ -35,7 +38,43 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
 
   useEffect(() => {
     loadStudentData();
+    fetchRetakePermissions();
+    
+    // Refresh retake permissions every 5 seconds
+    const interval = setInterval(() => {
+      fetchRetakePermissions();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, []);
+  
+  // Listen for quiz management events
+  useEffect(() => {
+    const handleQuizzesUpdated = () => {
+      loadStudentData();
+    };
+    window.addEventListener('quizzesUpdated', handleQuizzesUpdated);
+    return () => {
+      window.removeEventListener('quizzesUpdated', handleQuizzesUpdated);
+    };
+  }, []);
+  
+  const fetchRetakePermissions = async () => {
+    try {
+      const username = localStorage.getItem('username');
+      const response = await fetch(`http://localhost:8080/api/retake-permissions/student/${username}`);
+      if (response.ok) {
+        const permissions = await response.json();
+        console.log('Fetched retake permissions:', permissions);
+        setRetakePermissions(permissions);
+      } else {
+        setRetakePermissions([]);
+      }
+    } catch (err) {
+      console.error('Error fetching retake permissions:', err);
+      setRetakePermissions([]);
+    }
+  };
 
   useEffect(() => {
     const handleQuestionsUpdated = () => {
@@ -43,6 +82,7 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
     };
     const handleRetakePermissionUpdated = () => {
       loadStudentData();
+      fetchRetakePermissions();
     };
     const handleQuizSubmitted = () => {
       loadStudentData();
@@ -63,21 +103,60 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
     try {
       const username = localStorage.getItem('username');
       
-      // Load quizzes from localStorage (includes questions)
-      const quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
+      // Load quizzes from database API
+      let quizzes = [];
+      try {
+        const quizzesResponse = await fetch('http://localhost:8080/api/quizzes');
+        quizzes = await quizzesResponse.json();
+      } catch (err) {
+        console.error('Error fetching quizzes:', err);
+        quizzes = [];
+      }
       
-      const attempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
-      
-      // Filter attempts for current student
-      const studentAttempts = attempts.filter(attempt => attempt.studentName === username);
+      // Fetch quiz attempts from database
+      let studentAttempts = [];
+      try {
+        const response = await fetch('http://localhost:8080/api/quiz-attempts');
+        const allAttempts = await response.json();
+        console.log('All quiz attempts from database:', allAttempts);
+        studentAttempts = allAttempts.filter(attempt => attempt.studentName === username);
+        console.log('Filtered attempts for', username, ':', studentAttempts);
+      } catch (err) {
+        console.error('Error fetching quiz attempts:', err);
+        studentAttempts = [];
+      }
       
       // Calculate stats
-      const completedQuizIds = [...new Set(studentAttempts.map(attempt => attempt.quizId))];
-      const totalScore = studentAttempts.reduce((sum, attempt) => sum + attempt.score, 0);
+      const completedQuizIds = [...new Set(studentAttempts.map(attempt => attempt.quiz?.id || attempt.quizId))];
+      const totalScore = studentAttempts.reduce((sum, attempt) => {
+        const score = attempt.score || 0;
+        const total = attempt.totalQuestions || 1;
+        return sum + ((score / total) * 100);
+      }, 0);
       const averageScore = studentAttempts.length > 0 ? Math.round(totalScore / studentAttempts.length) : 0;
       
-      // Get recent attempts (last 5)
-      const recentAttempts = studentAttempts
+      // Get all attempts with quiz titles for proper tracking
+      const allAttempts = await Promise.all(
+        studentAttempts
+          .map(async (attempt) => {
+            try {
+              const quizId = attempt.quiz?.id || attempt.quizId;
+              const quiz = quizzes.find(q => q.id === quizId);
+              return {
+                ...attempt,
+                quizTitle: quiz?.title || 'Unknown Quiz'
+              };
+            } catch (err) {
+              return {
+                ...attempt,
+                quizTitle: 'Unknown Quiz'
+              };
+            }
+          })
+      );
+      
+      // Get recent attempts (last 5) for display
+      const recentAttempts = allAttempts
         .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
         .slice(0, 5);
 
@@ -85,24 +164,24 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
         totalQuizzes: quizzes.length,
         completedQuizzes: completedQuizIds.length,
         averageScore,
-        recentAttempts
+        recentAttempts: allAttempts // Store all attempts for checking
       });
 
       // Load question counts for each quiz
       const counts = {};
-      const deletedQuestions = JSON.parse(localStorage.getItem('deletedQuestions') || '[]');
       
       for (const quiz of quizzes) {
         try {
           const response = await fetch(`http://localhost:8080/api/quizzes/${quiz.id}/questions`);
           if (response.ok) {
             const questions = await response.json();
-            const activeQuestions = questions.filter(q => !deletedQuestions.includes(q.id));
-            counts[quiz.id] = activeQuestions.length;
+            counts[quiz.id] = questions.length;
           } else {
+            console.warn(`Quiz ${quiz.id} has no questions or endpoint not found`);
             counts[quiz.id] = 0;
           }
         } catch (err) {
+          console.warn(`Error fetching questions for quiz ${quiz.id}:`, err);
           counts[quiz.id] = 0;
         }
       }

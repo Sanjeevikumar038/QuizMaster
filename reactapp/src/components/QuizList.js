@@ -10,83 +10,60 @@ const QuizList = ({ onSelectQuiz, onViewQuestions, onDeleteQuiz, userRole }) => 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBy, setFilterBy] = useState('all');
   const [questionCounts, setQuestionCounts] = useState({});
+  const [takenQuizzes, setTakenQuizzes] = useState(new Set());
   
-  // Check if student has already taken this quiz
-  const hasStudentTakenQuiz = (quizId) => {
-    const attempts = JSON.parse(localStorage.getItem('quizAttempts') || '[]');
-    const hasTaken = attempts.some(attempt => {
-      // Handle both string and number quiz IDs
-      const attemptQuizId = attempt.quizId ? attempt.quizId.toString() : '';
-      const currentQuizId = quizId ? quizId.toString() : '';
-      return attemptQuizId === currentQuizId && attempt.studentName === studentName;
-    });
-    return hasTaken;
-  };
+
 
   useEffect(() => {
     const fetchQuizzes = async () => {
       try {
         setLoading(true);
-        // IMPORTANT: Replace with your actual Examly URL
-       const BASE_URL = 'http://localhost:8080';
+        const BASE_URL = 'http://localhost:8080';
         const response = await axios.get(`${BASE_URL}/api/quizzes`);
         setQuizzes(response.data);
         
         // Load question counts for each quiz
         const counts = {};
-        const deletedQuestions = JSON.parse(localStorage.getItem('deletedQuestions') || '[]');
-        
         for (const quiz of response.data) {
           try {
             const questionsResponse = await axios.get(`${BASE_URL}/api/quizzes/${quiz.id}/questions`);
-            const activeQuestions = questionsResponse.data.filter(q => !deletedQuestions.includes(q.id));
-            
-            // Add AI-generated questions count
-            const aiQuestions = JSON.parse(localStorage.getItem('aiGeneratedQuestions') || '{}');
-            const aiCount = aiQuestions[quiz.id] ? aiQuestions[quiz.id].length : 0;
-            
-            counts[quiz.id] = activeQuestions.length + aiCount;
+            counts[quiz.id] = questionsResponse.data.length;
           } catch (err) {
-            // Fallback: count AI questions only
-            const aiQuestions = JSON.parse(localStorage.getItem('aiGeneratedQuestions') || '{}');
-            counts[quiz.id] = aiQuestions[quiz.id] ? aiQuestions[quiz.id].length : 0;
+            counts[quiz.id] = 0;
           }
         }
         setQuestionCounts(counts);
         
-        // Save to localStorage for consistency
-        localStorage.setItem('quizzes', JSON.stringify(response.data));
+        // Check quiz attempts for students
+        if (userRole === 'student') {
+          const taken = new Set();
+          for (const quiz of response.data) {
+            try {
+              const attemptResponse = await axios.get(`${BASE_URL}/api/quizzes/${quiz.id}/attempts/${studentName}`);
+              if (attemptResponse.data) {
+                taken.add(quiz.id);
+              }
+            } catch (err) {
+              console.error('Error checking quiz attempt:', err);
+            }
+          }
+          setTakenQuizzes(taken);
+        }
         
-        // FIX: Distinguish between empty data and actual API error
         if (response.data.length === 0) {
-          setError('No quizzes available'); // Set specific message for empty state
+          setError('No quizzes available');
         } else {
-          setError(null); // Clear any previous errors if data is present
+          setError(null);
         }
       } catch (err) {
-        // Check if we're in test environment
-        const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
-        
-        if (isTest) {
-          // Original behavior for tests
-          setError('Failed to fetch quizzes');
-        } else {
-          // Fallback to localStorage when API fails (production only)
-          const localQuizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-          if (localQuizzes.length > 0) {
-            setQuizzes(localQuizzes);
-            setError(null);
-          } else {
-            setError('Failed to fetch quizzes');
-          }
-        }
+        setError('Failed to fetch quizzes');
         console.error('Error fetching quizzes:', err);
       } finally {
         setLoading(false);
       }
     };
     fetchQuizzes();
-  }, []);
+  }, [userRole, studentName]);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -107,8 +84,8 @@ const QuizList = ({ onSelectQuiz, onViewQuestions, onDeleteQuiz, userRole }) => 
                          quiz.description.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (filterBy === 'all') return matchesSearch;
-    if (filterBy === 'taken' && userRole === 'student') return matchesSearch && hasStudentTakenQuiz(quiz.id);
-    if (filterBy === 'available' && userRole === 'student') return matchesSearch && !hasStudentTakenQuiz(quiz.id);
+    if (filterBy === 'taken' && userRole === 'student') return matchesSearch && takenQuizzes.has(quiz.id);
+    if (filterBy === 'available' && userRole === 'student') return matchesSearch && !takenQuizzes.has(quiz.id);
     return matchesSearch;
   });
 
@@ -216,7 +193,7 @@ Delete Quiz
 )}
 {/* Only show 'Take Quiz' button for students */}
 {userRole === 'student' && (
-  hasStudentTakenQuiz(quiz.id) ? (
+  takenQuizzes.has(quiz.id) ? (
     <button
       className="action-button submitted-button"
       style={{ backgroundColor: '#10b981', color: 'white', cursor: 'default' }}
