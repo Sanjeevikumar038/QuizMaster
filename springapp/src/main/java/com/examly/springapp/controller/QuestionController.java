@@ -24,3 +24,23 @@ public class QuestionController {
         return new ResponseEntity<>(questions, HttpStatus.OK);
     }
 }
+
+@RestController
+@RequestMapping("/api/questions")
+@CrossOrigin(origins = {"http://localhost:3000", "https://quizmastersk.netlify.app"})
+class QuestionManagementController {
+    @Autowired
+    private QuestionService questionService;
+    
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteQuestion(@PathVariable Long id) {
+        questionService.deleteQuestion(id);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+    
+    @PutMapping("/{id}")
+    public ResponseEntity<QuestionDTO> updateQuestion(@PathVariable Long id, @Valid @RequestBody QuestionDTO questionDTO) {
+        QuestionDTO updatedQuestion = questionService.updateQuestion(id, questionDTO);
+        return new ResponseEntity<>(updatedQuestion, HttpStatus.OK);
+    }
+}

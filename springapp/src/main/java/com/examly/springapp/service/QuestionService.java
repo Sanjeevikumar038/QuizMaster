@@ -74,4 +74,46 @@ return optionDTO;
 questionDTO.setOptions(optionDTOs);
 return questionDTO;
 }
+
+@Transactional
+public void deleteQuestion(Long questionId) {
+    Question question = questionRepository.findById(questionId)
+            .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+    optionRepository.deleteByQuestionId(questionId);
+    questionRepository.delete(question);
+}
+
+@Transactional
+public QuestionDTO updateQuestion(Long questionId, QuestionDTO questionDTO) {
+    Question question = questionRepository.findById(questionId)
+            .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+    
+    long correctOptionsCount = questionDTO.getOptions().stream()
+            .filter(OptionDTO::getIsCorrect)
+            .count();
+    if (correctOptionsCount != 1) {
+        throw new BadRequestException("Each question must have exactly one correct option");
+    }
+    
+    question.setQuestionText(questionDTO.getQuestionText());
+    question.setQuestionType(questionDTO.getQuestionType());
+    Question savedQuestion = questionRepository.save(question);
+    
+    // Delete existing options
+    optionRepository.deleteByQuestionId(questionId);
+    
+    // Create new options
+    List<Option> options = questionDTO.getOptions().stream()
+            .map(optionDTO -> {
+                Option option = new Option();
+                option.setQuestion(savedQuestion);
+                option.setOptionText(optionDTO.getOptionText());
+                option.setIsCorrect(optionDTO.getIsCorrect());
+                return option;
+            })
+            .collect(Collectors.toList());
+    optionRepository.saveAll(options);
+    
+    return convertToDTO(savedQuestion, options);
+}
 }

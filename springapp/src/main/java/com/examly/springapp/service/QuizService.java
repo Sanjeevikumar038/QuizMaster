@@ -3,9 +3,12 @@ import com.examly.springapp.dto.QuizDTO;
 import com.examly.springapp.exception.ResourceNotFoundException;
 import com.examly.springapp.model.Quiz;
 import com.examly.springapp.repository.QuizRepository;
-// import com.examly.springapp.repository.QuizAttemptRepository;
+import com.examly.springapp.repository.QuestionRepository;
+import com.examly.springapp.repository.OptionRepository;
+import com.examly.springapp.repository.QuizAttemptRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -13,6 +16,12 @@ import java.util.stream.Collectors;
 public class QuizService {
     @Autowired
     private QuizRepository quizRepository;
+    @Autowired
+    private QuestionRepository questionRepository;
+    @Autowired
+    private OptionRepository optionRepository;
+    @Autowired
+    private QuizAttemptRepository quizAttemptRepository;
     public QuizDTO createQuiz(QuizDTO quizDTO) {
         Quiz quiz = new Quiz();
         quiz.setTitle(quizDTO.getTitle());
@@ -43,18 +52,28 @@ quiz.setUpdatedAt(new Date());
 Quiz updatedQuiz = quizRepository.save(quiz);
 return convertToDTO(updatedQuiz);
 }
+@Transactional
 public void deleteQuiz(Long id) {
-if (!quizRepository.existsById(id)) {
-throw new ResourceNotFoundException("Quiz not found");
+    if (!quizRepository.existsById(id)) {
+        throw new ResourceNotFoundException("Quiz not found");
+    }
+    
+    // Delete quiz attempts first
+    quizAttemptRepository.deleteByQuizId(id);
+    
+    // Delete options for all questions in this quiz
+    questionRepository.findByQuizId(id).forEach(question -> {
+        optionRepository.deleteByQuestionId(question.getId());
+    });
+    
+    // Delete questions
+    questionRepository.deleteByQuizId(id);
+    
+    // Finally delete the quiz
+    quizRepository.deleteById(id);
 }
-quizRepository.deleteById(id);
-}
-// @Autowired
-// private QuizAttemptRepository quizAttemptRepository;
-
 public boolean hasStudentTakenQuiz(Long quizId, String studentName) {
-    // return quizAttemptRepository.existsByQuizIdAndStudentName(quizId, studentName);
-    return false; // Disabled for compilation
+    return quizAttemptRepository.existsByQuizIdAndStudentName(quizId, studentName);
 }
 
 private QuizDTO convertToDTO(Quiz quiz) {

@@ -1,6 +1,7 @@
 // Email Service for QuizMaster
 // Uses EmailJS for client-side email sending
 import emailjs from 'emailjs-com';
+import { API_BASE_URL } from '../utils/constants';
 
 class EmailService {
   constructor() {
@@ -74,7 +75,7 @@ class EmailService {
     
     try {
       // Fetch students from database instead of localStorage
-      const response = await fetch('http://localhost:8080/api/students');
+      const response = await fetch(`${API_BASE_URL}/students`);
       const students = await response.json();
       studentsWithEmail = students.filter(student => student.email);
       
@@ -136,7 +137,7 @@ class EmailService {
   // Helper methods
   async getStudentName(email) {
     try {
-      const response = await fetch('http://localhost:8080/api/students');
+      const response = await fetch(`${API_BASE_URL}/students`);
       const students = await response.json();
       const student = students.find(s => s.email === email || `${s.username}@example.com` === email);
       return student ? student.username : email.split('@')[0];

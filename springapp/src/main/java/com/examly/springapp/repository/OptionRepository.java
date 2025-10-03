@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface OptionRepository extends JpaRepository<Option, Long> {
     Option findByQuestionAndIsCorrect(Question question, Boolean isCorrect);
+    void deleteByQuestionId(Long questionId);
 }

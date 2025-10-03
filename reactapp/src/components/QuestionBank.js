@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './QuestionBank.css';
+import { API_BASE_URL } from '../utils/constants';
 
 const QuestionBank = () => {
   const [questions, setQuestions] = useState([]);
@@ -16,12 +17,12 @@ const QuestionBank = () => {
     const allQuestions = [];
     
     try {
-      const response = await fetch('http://localhost:8080/api/quizzes');
+      const response = await fetch(`${API_BASE_URL}/quizzes`);
       const apiQuizzes = await response.json();
       
       for (const quiz of apiQuizzes) {
         try {
-          const qResponse = await fetch(`http://localhost:8080/api/quizzes/${quiz.id}/questions`);
+          const qResponse = await fetch(`${API_BASE_URL}/quizzes/${quiz.id}/questions`);
           const questions = await qResponse.json();
           questions.forEach(q => {
             allQuestions.push({
@@ -47,7 +48,7 @@ const QuestionBank = () => {
     if (!window.confirm('Are you sure you want to delete this question?')) return;
     
     try {
-      await fetch(`http://localhost:8080/api/questions/${questionId}`, {
+      await fetch(`${API_BASE_URL}/questions/${questionId}`, {
         method: 'DELETE'
       });
       
@@ -76,7 +77,7 @@ const QuestionBank = () => {
     };
     
     try {
-      await fetch(`http://localhost:8080/api/questions/${questionId}`, {
+      await fetch(`${API_BASE_URL}/questions/${questionId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
