@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { buttonStyles } from './buttonStyles';
 import { useToast, ToastContainer } from './Toast';
+import { API_BASE_URL } from '../utils/constants';
 
 const AIQuestionGenerator = ({ quizId, onQuestionsGenerated, availableQuizzes = [] }) => {
   const [topic, setTopic] = useState('');
@@ -59,7 +60,7 @@ const AIQuestionGenerator = ({ quizId, onQuestionsGenerated, availableQuizzes = 
         
         try {
           // Try API first
-          const response = await fetch('http://localhost:8080/api/quizzes', {
+          const response = await fetch(`${API_BASE_URL}/quizzes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newQuiz)
@@ -105,7 +106,7 @@ const AIQuestionGenerator = ({ quizId, onQuestionsGenerated, availableQuizzes = 
           };
           
           try {
-            await fetch(`http://localhost:8080/api/quizzes/${targetQuizId}/questions`, {
+            await fetch(`${API_BASE_URL}/quizzes/${targetQuizId}/questions`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(questionData)

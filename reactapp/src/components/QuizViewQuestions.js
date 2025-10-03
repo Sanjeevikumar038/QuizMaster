@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/constants';
 
 const QuizViewQuestions = ({ quizId, onReturnHome }) => {
   const [quiz, setQuiz] = useState(null);
@@ -24,14 +25,12 @@ const QuizViewQuestions = ({ quizId, onReturnHome }) => {
           setQuestions(localQuiz.questions.filter(q => !deletedQuestions.includes(q.id)));
         } else {
           // Fallback to API
-          const BASE_URL = 'http://localhost:8080';
-
           // Fetch quiz details
-          const quizResponse = await axios.get(`${BASE_URL}/api/quizzes/${quizId}`);
+          const quizResponse = await axios.get(`${API_BASE_URL}/quizzes/${quizId}`);
           setQuiz(quizResponse.data);
 
           // Fetch questions for the quiz
-          const questionsResponse = await axios.get(`${BASE_URL}/api/quizzes/${quizId}/questions`);
+          const questionsResponse = await axios.get(`${API_BASE_URL}/quizzes/${quizId}/questions`);
           
           // Filter out deleted questions and apply localStorage edits
           let apiQuestions = questionsResponse.data.filter(q => !deletedQuestions.includes(q.id));

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/constants';
 
 const QuestionForm = ({ quizId, onQuestionAdded }) => {
   const [questionText, setQuestionText] = useState('');
@@ -80,7 +81,7 @@ const QuestionForm = ({ quizId, onQuestionAdded }) => {
 
     try {
 await axios.post(
-`http://localhost:8080/api/quizzes/${quizId}/questions`,
+`${API_BASE_URL}/quizzes/${quizId}/questions`,
 newQuestion
 );
 setMessage('Question added!');

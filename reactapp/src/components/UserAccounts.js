@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 const UserAccounts = () => {
   const [users, setUsers] = useState([]);
@@ -15,7 +16,7 @@ const UserAccounts = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/students');
+      const response = await fetch(`${API_BASE_URL}/students`);
       const students = await response.json();
       
       const studentUsers = students.map(student => ({
@@ -62,7 +63,7 @@ const UserAccounts = () => {
   const deleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user? They will not be able to login or signup again.')) {
       try {
-        await fetch(`http://localhost:8080/api/students/${userId}`, {
+        await fetch(`${API_BASE_URL}/students/${userId}`, {
           method: 'DELETE'
         });
         setUsers(users.filter(user => user.id !== userId));

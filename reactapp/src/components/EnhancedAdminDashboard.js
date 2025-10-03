@@ -7,6 +7,7 @@ import AIQuestionGenerator from './AIQuestionGenerator';
 import EmailNotifications from './EmailNotifications';
 import CSVImport from './CSVImport';
 import './ModernUI.css';
+import { API_BASE_URL } from '../utils/constants';
 
 const EnhancedAdminDashboard = ({ 
   onManageQuizzes, 
@@ -41,8 +42,7 @@ const EnhancedAdminDashboard = ({
 
   const loadQuizzes = async () => {
     try {
-      const BASE_URL = 'http://localhost:8080';
-      const response = await axios.get(`${BASE_URL}/api/quizzes`);
+      const response = await axios.get(`${API_BASE_URL}/quizzes`);
       setAvailableQuizzes(response.data);
     } catch (error) {
       const localQuizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
@@ -101,12 +101,10 @@ const EnhancedAdminDashboard = ({
 
   const loadAdminData = async () => {
     try {
-      const BASE_URL = 'http://localhost:8080';
-      
       // Fetch from database APIs
       const [quizzesRes, studentsRes] = await Promise.all([
-        axios.get(`${BASE_URL}/api/quizzes`),
-        axios.get(`${BASE_URL}/api/students`)
+        axios.get(`${API_BASE_URL}/quizzes`),
+        axios.get(`${API_BASE_URL}/students`)
       ]);
       
       const quizzes = quizzesRes.data;
@@ -115,7 +113,7 @@ const EnhancedAdminDashboard = ({
       // Try to fetch attempts, fallback to empty array if endpoint doesn't exist
       let attempts = [];
       try {
-        const attemptsRes = await axios.get(`${BASE_URL}/api/quiz-attempts`);
+        const attemptsRes = await axios.get(`${API_BASE_URL}/quiz-attempts`);
         attempts = attemptsRes.data;
       } catch (err) {
         console.log('Quiz attempts endpoint not available');
@@ -125,7 +123,7 @@ const EnhancedAdminDashboard = ({
       let totalQuestions = 0;
       for (const quiz of quizzes) {
         try {
-          const questionsResponse = await axios.get(`${BASE_URL}/api/quizzes/${quiz.id}/questions`);
+          const questionsResponse = await axios.get(`${API_BASE_URL}/quizzes/${quiz.id}/questions`);
           totalQuestions += questionsResponse.data.length;
         } catch (qErr) {
           console.log(`Failed to fetch questions for quiz ${quiz.id}`);

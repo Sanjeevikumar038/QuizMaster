@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/quiz-attempts")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "false")
+@CrossOrigin(origins = {"http://localhost:3000", "https://quizmastersk.netlify.app"}, allowCredentials = "false")
 public class WorkingQuizAttemptController {
     
     @Autowired

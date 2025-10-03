@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ModernUI.css';
+import { API_BASE_URL } from '../utils/constants';
 
 const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard }) => {
   const [studentStats, setStudentStats] = useState({
@@ -62,7 +63,7 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
   const fetchRetakePermissions = async () => {
     try {
       const username = localStorage.getItem('username');
-      const response = await fetch(`http://localhost:8080/api/retake-permissions/student/${username}`);
+      const response = await fetch(`${API_BASE_URL}/retake-permissions/student/${username}`);
       if (response.ok) {
         const permissions = await response.json();
         console.log('Fetched retake permissions:', permissions);
@@ -106,7 +107,7 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
       // Load quizzes from database API
       let quizzes = [];
       try {
-        const quizzesResponse = await fetch('http://localhost:8080/api/quizzes');
+        const quizzesResponse = await fetch(`${API_BASE_URL}/quizzes`);
         quizzes = await quizzesResponse.json();
       } catch (err) {
         console.error('Error fetching quizzes:', err);
@@ -116,7 +117,7 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
       // Fetch quiz attempts from database
       let studentAttempts = [];
       try {
-        const response = await fetch('http://localhost:8080/api/quiz-attempts');
+        const response = await fetch(`${API_BASE_URL}/quiz-attempts`);
         const allAttempts = await response.json();
         console.log('All quiz attempts from database:', allAttempts);
         studentAttempts = allAttempts.filter(attempt => attempt.studentName === username);
@@ -167,7 +168,7 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
       
       for (const quiz of quizzes) {
         try {
-          const response = await fetch(`http://localhost:8080/api/quizzes/${quiz.id}/questions`);
+          const response = await fetch(`${API_BASE_URL}/quizzes/${quiz.id}/questions`);
           if (response.ok) {
             const questions = await response.json();
             counts[quiz.id] = questions.length;

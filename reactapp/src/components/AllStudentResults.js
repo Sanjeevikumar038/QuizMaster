@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 const AllStudentResults = () => {
   const [results, setResults] = useState([]);
@@ -19,7 +20,7 @@ const AllStudentResults = () => {
 
   const handleAllowRetake = async (studentName, quizId, quizTitle) => {
     try {
-      const response = await fetch('http://localhost:8080/api/retake-permissions', {
+      const response = await fetch(`${API_BASE_URL}/retake-permissions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -58,7 +59,7 @@ const AllStudentResults = () => {
   
   const fetchRetakePermissions = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/retake-permissions');
+      const response = await fetch(`${API_BASE_URL}/retake-permissions`);
       const permissions = await response.json();
       setRetakePermissions(permissions);
     } catch (err) {
@@ -69,7 +70,7 @@ const AllStudentResults = () => {
   const fetchAllResults = async () => {
     try {
       // Fetch quiz attempts from database
-      const response = await fetch('http://localhost:8080/api/quiz-attempts');
+      const response = await fetch(`${API_BASE_URL}/quiz-attempts`);
       const allAttempts = await response.json();
       
       // Fetch quiz details for each attempt
@@ -81,7 +82,7 @@ const AllStudentResults = () => {
             
             if (quizId && !attempt.quizTitle) {
               try {
-                const quizResponse = await fetch(`http://localhost:8080/api/quizzes/${quizId}`);
+                const quizResponse = await fetch(`${API_BASE_URL}/quizzes/${quizId}`);
                 const quiz = await quizResponse.json();
                 quizTitle = quiz.title;
               } catch (err) {

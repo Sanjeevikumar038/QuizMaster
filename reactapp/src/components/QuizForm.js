@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useToast, ToastContainer } from './Toast';
+import { API_BASE_URL } from '../utils/constants';
 
 const QuizForm = ({ onQuizCreated }) => {
   const [title, setTitle] = useState('');
@@ -34,7 +35,7 @@ const QuizForm = ({ onQuizCreated }) => {
 
 try {
 const newQuiz = { title, description, timeLimit: parseInt(timeLimit) };
-await axios.post('http://localhost:8080/api/quizzes', newQuiz);
+await axios.post(`${API_BASE_URL}/quizzes`, newQuiz);
 addToast('Quiz created successfully!', 'success');
 setTitle('');
 setDescription('');

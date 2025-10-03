@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './ModernUI.css';
 import './Leaderboard.css';
+import { API_BASE_URL } from '../utils/constants';
 
 const Leaderboard = ({ onBack }) => {
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -12,7 +13,7 @@ const Leaderboard = ({ onBack }) => {
   const loadLeaderboardData = useCallback(async () => {
     try {
       // Fetch quiz attempts from database
-      const response = await fetch('http://localhost:8080/api/quiz-attempts');
+      const response = await fetch(`${API_BASE_URL}/quiz-attempts`);
       const attempts = await response.json();
       console.log('Leaderboard - All attempts:', attempts);
       
@@ -20,7 +21,7 @@ const Leaderboard = ({ onBack }) => {
       const attemptsWithTitles = await Promise.all(
         attempts.map(async (attempt) => {
           try {
-            const quizResponse = await fetch(`http://localhost:8080/api/quizzes/${attempt.quiz.id}`);
+            const quizResponse = await fetch(`${API_BASE_URL}/quizzes/${attempt.quiz.id}`);
             const quiz = await quizResponse.json();
             return {
               ...attempt,

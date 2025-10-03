@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
+import { API_BASE_URL } from '../utils/constants';
 
 const TakeQuiz = ({ quizId, onQuizCompleted }) => {
     const [quiz, setQuiz] = useState(null);
@@ -111,9 +112,9 @@ const TakeQuiz = ({ quizId, onQuizCompleted }) => {
             try {
                 setLoading(true);
                 
-                const quizResponse = await axios.get(`http://localhost:8080/api/quizzes/${quizId}`);
+                const quizResponse = await axios.get(`${API_BASE_URL}/quizzes/${quizId}`);
                 setQuiz(quizResponse.data);
-                const questionsResponse = await axios.get(`http://localhost:8080/api/quizzes/${quizId}/questions`);
+                const questionsResponse = await axios.get(`${API_BASE_URL}/quizzes/${quizId}/questions`);
                 
                 // Use questions directly from database
                 const finalQuestions = questionsResponse.data;
@@ -237,7 +238,7 @@ await exitFullscreen();
 // Small delay to ensure fullscreen exit completes
 setTimeout(() => {
 // Submit to database API
-axios.post(`http://localhost:8080/api/quiz-attempts`, quizAttemptData)
+axios.post(`${API_BASE_URL}/quiz-attempts`, quizAttemptData)
 .then(async (result) => {
 console.log('Quiz submission successful:', result.data);
 console.log('Response status:', result.status);
@@ -245,7 +246,7 @@ console.log('Response status:', result.status);
 // Send result email to student
 try {
   // Get student email from database
-  const studentsResponse = await fetch('http://localhost:8080/api/students');
+  const studentsResponse = await fetch(`${API_BASE_URL}/students`);
   const students = await studentsResponse.json();
   const currentStudent = students.find(s => s.username === studentName);
   

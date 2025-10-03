@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
+import { API_BASE_URL } from '../utils/constants';
 
 const QuizList = ({ onSelectQuiz, onViewQuestions, onDeleteQuiz, userRole }) => { 
   const [quizzes, setQuizzes] = useState([]);
@@ -18,15 +19,14 @@ const QuizList = ({ onSelectQuiz, onViewQuestions, onDeleteQuiz, userRole }) => 
     const fetchQuizzes = async () => {
       try {
         setLoading(true);
-        const BASE_URL = 'http://localhost:8080';
-        const response = await axios.get(`${BASE_URL}/api/quizzes`);
+        const response = await axios.get(`${API_BASE_URL}/quizzes`);
         setQuizzes(response.data);
         
         // Load question counts for each quiz
         const counts = {};
         for (const quiz of response.data) {
           try {
-            const questionsResponse = await axios.get(`${BASE_URL}/api/quizzes/${quiz.id}/questions`);
+            const questionsResponse = await axios.get(`${API_BASE_URL}/quizzes/${quiz.id}/questions`);
             counts[quiz.id] = questionsResponse.data.length;
           } catch (err) {
             counts[quiz.id] = 0;
@@ -39,7 +39,7 @@ const QuizList = ({ onSelectQuiz, onViewQuestions, onDeleteQuiz, userRole }) => 
           const taken = new Set();
           for (const quiz of response.data) {
             try {
-              const attemptResponse = await axios.get(`${BASE_URL}/api/quizzes/${quiz.id}/attempts/${studentName}`);
+              const attemptResponse = await axios.get(`${API_BASE_URL}/quizzes/${quiz.id}/attempts/${studentName}`);
               if (attemptResponse.data) {
                 taken.add(quiz.id);
               }

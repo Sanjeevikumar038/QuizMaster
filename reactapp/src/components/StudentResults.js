@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './ModernUI.css';
+import { API_BASE_URL } from '../utils/constants';
 
 const StudentResults = ({ studentId = 'current-student' }) => {
   const [results, setResults] = useState([]);
@@ -11,7 +12,7 @@ const StudentResults = ({ studentId = 'current-student' }) => {
       console.log('Fetching results for student:', currentStudentName);
       
       // Fetch quiz attempts from database
-      const response = await fetch('http://localhost:8080/api/quiz-attempts');
+      const response = await fetch(`${API_BASE_URL}/quiz-attempts`);
       const allAttempts = await response.json();
       console.log('StudentResults - All attempts:', allAttempts);
       
@@ -26,7 +27,7 @@ const StudentResults = ({ studentId = 'current-student' }) => {
         studentAttempts.map(async (attempt) => {
           try {
             const quizId = attempt.quizId || attempt.quiz?.id;
-            const quizResponse = await fetch(`http://localhost:8080/api/quizzes/${quizId}`);
+            const quizResponse = await fetch(`${API_BASE_URL}/quizzes/${quizId}`);
             const quiz = await quizResponse.json();
             
             // Format time taken

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { buttonStyles } from './buttonStyles';
 import { handleApiError } from './errorHandler';
+import { API_BASE_URL } from '../utils/constants';
 
 const ManageQuizzes = () => {
   const [quizzes, setQuizzes] = useState([]);
@@ -26,7 +27,7 @@ const ManageQuizzes = () => {
   const fetchQuizzes = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8080/api/quizzes');
+      const response = await axios.get(`${API_BASE_URL}/quizzes`);
       setQuizzes(response.data);
       setError(''); // Clear any previous errors
       setLoading(false);
@@ -40,7 +41,7 @@ const ManageQuizzes = () => {
     if (!window.confirm('Are you sure you want to delete this quiz?')) return;
     
     try {
-      await axios.delete(`http://localhost:8080/api/quizzes/${quizId}`);
+      await axios.delete(`${API_BASE_URL}/quizzes/${quizId}`);
       setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
       // Notify other components that quizzes were updated
       window.dispatchEvent(new Event('quizzesUpdated'));
