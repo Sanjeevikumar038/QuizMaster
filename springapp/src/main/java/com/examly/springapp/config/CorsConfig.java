@@ -20,6 +20,7 @@ public class CorsConfig {
         config.addAllowedOriginPattern("http://127.0.0.1:*");
         config.addAllowedOriginPattern("file://*");
         config.addAllowedOrigin("null");
+        config.addAllowedOrigin("https://quizmastersk.netlify.app");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         
