@@ -114,14 +114,13 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
         quizzes = [];
       }
       
-      // Fetch quiz attempts from database
+      // Fetch only student's quiz attempts
       let studentAttempts = [];
       try {
-        const response = await fetch(`${API_BASE_URL}/quiz-attempts`);
-        const allAttempts = await response.json();
-        console.log('All quiz attempts from database:', allAttempts);
-        studentAttempts = allAttempts.filter(attempt => attempt.studentName === username);
-        console.log('Filtered attempts for', username, ':', studentAttempts);
+        const response = await fetch(`${API_BASE_URL}/quiz-attempts/student/${username}`);
+        if (response.ok) {
+          studentAttempts = await response.json();
+        }
       } catch (err) {
         console.error('Error fetching quiz attempts:', err);
         studentAttempts = [];
@@ -136,25 +135,15 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
       }, 0);
       const averageScore = studentAttempts.length > 0 ? Math.round(totalScore / studentAttempts.length) : 0;
       
-      // Get all attempts with quiz titles for proper tracking
-      const allAttempts = await Promise.all(
-        studentAttempts
-          .map(async (attempt) => {
-            try {
-              const quizId = attempt.quiz?.id || attempt.quizId;
-              const quiz = quizzes.find(q => q.id === quizId);
-              return {
-                ...attempt,
-                quizTitle: quiz?.title || 'Unknown Quiz'
-              };
-            } catch (err) {
-              return {
-                ...attempt,
-                quizTitle: 'Unknown Quiz'
-              };
-            }
-          })
-      );
+      // Get all attempts with quiz titles using local lookup
+      const allAttempts = studentAttempts.map(attempt => {
+        const quizId = attempt.quiz?.id || attempt.quizId;
+        const quiz = quizzes.find(q => q.id === quizId);
+        return {
+          ...attempt,
+          quizTitle: quiz?.title || 'Unknown Quiz'
+        };
+      });
       
       setStudentStats({
         totalQuizzes: quizzes.length,
@@ -163,24 +152,25 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
         recentAttempts: allAttempts.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt)) // Store all attempts for checking
       });
 
-      // Load question counts for each quiz
-      const counts = {};
-      
-      for (const quiz of quizzes) {
+      // Load question counts for all quizzes in parallel
+      const questionPromises = quizzes.map(async (quiz) => {
         try {
           const response = await fetch(`${API_BASE_URL}/quizzes/${quiz.id}/questions`);
           if (response.ok) {
             const questions = await response.json();
-            counts[quiz.id] = questions.length;
-          } else {
-            console.warn(`Quiz ${quiz.id} has no questions or endpoint not found`);
-            counts[quiz.id] = 0;
+            return { quizId: quiz.id, count: questions.length };
           }
+          return { quizId: quiz.id, count: 0 };
         } catch (err) {
-          console.warn(`Error fetching questions for quiz ${quiz.id}:`, err);
-          counts[quiz.id] = 0;
+          return { quizId: quiz.id, count: 0 };
         }
-      }
+      });
+      
+      const questionResults = await Promise.all(questionPromises);
+      const counts = {};
+      questionResults.forEach(result => {
+        counts[result.quizId] = result.count;
+      });
       setQuestionCounts(counts);
       
       setAvailableQuizzes(quizzes);

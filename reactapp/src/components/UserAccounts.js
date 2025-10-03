@@ -24,7 +24,7 @@ const UserAccounts = () => {
         name: student.username,
         email: student.email,
         role: 'student',
-        active: true,
+        active: student.active !== false,
         joinedDate: new Date(student.createdAt).toISOString().split('T')[0]
       }));
       
@@ -53,11 +53,29 @@ const UserAccounts = () => {
     setShowAddForm(false);
   };
 
-  const toggleUserStatus = (userId) => {
-    const updatedUsers = users.map(user => 
-      user.id === userId ? {...user, active: !user.active} : user
-    );
-    setUsers(updatedUsers);
+  const toggleUserStatus = async (userId) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    
+    try {
+      await fetch(`${API_BASE_URL}/students/${userId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          active: !user.active
+        })
+      });
+      
+      const updatedUsers = users.map(u => 
+        u.id === userId ? {...u, active: !u.active} : u
+      );
+      setUsers(updatedUsers);
+    } catch (err) {
+      console.error('Error updating student status:', err);
+      alert('Failed to update student status');
+    }
   };
 
   const deleteUser = async (userId) => {

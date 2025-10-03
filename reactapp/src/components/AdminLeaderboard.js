@@ -13,34 +13,29 @@ const AdminLeaderboard = ({ onBack }) => {
 
   const loadLeaderboardData = useCallback(async () => {
     try {
-      // Fetch quiz attempts from database
-      const response = await fetch(`${API_BASE_URL}/quiz-attempts`);
-      const attempts = await response.json();
+      // Fetch both quiz attempts and quizzes in parallel
+      const [attemptsResponse, quizzesResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/quiz-attempts`),
+        fetch(`${API_BASE_URL}/quizzes`)
+      ]);
       
-      // Fetch quiz details and create attempts with quiz titles
-      const attemptsWithTitles = await Promise.all(
-        attempts.map(async (attempt) => {
-          try {
-            const quizResponse = await fetch(`${API_BASE_URL}/quizzes/${attempt.quiz.id}`);
-            const quiz = await quizResponse.json();
-            return {
-              ...attempt,
-              quizTitle: quiz.title,
-              score: (attempt.score / attempt.totalQuestions) * 100
-            };
-          } catch (err) {
-            return {
-              ...attempt,
-              quizTitle: 'Unknown Quiz',
-              score: (attempt.score / attempt.totalQuestions) * 100
-            };
-          }
-        })
-      );
+      const attempts = await attemptsResponse.json();
+      const allQuizzes = await quizzesResponse.json();
       
-      // Get unique quiz titles for filter dropdown
-      const uniqueQuizzes = [...new Set(attemptsWithTitles.map(attempt => attempt.quizTitle))];
-      setAvailableQuizzes(uniqueQuizzes);
+      // Create attempts with quiz titles using the quiz lookup
+      const attemptsWithTitles = attempts.map(attempt => {
+        const quizId = attempt.quizId || attempt.quiz?.id;
+        const quiz = allQuizzes.find(q => q.id === quizId);
+        return {
+          ...attempt,
+          quizTitle: quiz?.title || attempt.quizTitle || 'Deleted Quiz',
+          score: (attempt.score / attempt.totalQuestions) * 100
+        };
+      }).filter(attempt => attempt.quizTitle !== 'Deleted Quiz'); // Filter out deleted quizzes
+      
+      // Get quiz titles from all available quizzes (not just attempted ones)
+      const allQuizTitles = allQuizzes.map(quiz => quiz.title);
+      setAvailableQuizzes(allQuizTitles);
       
       // Filter attempts by selected quiz if not 'all'
       const filteredAttempts = selectedQuiz === 'all' ? attemptsWithTitles : attemptsWithTitles.filter(attempt => attempt.quizTitle === selectedQuiz);

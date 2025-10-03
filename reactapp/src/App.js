@@ -16,6 +16,7 @@ import AllStudentResults from './components/AllStudentResults';
 import UserAccounts from './components/UserAccounts';
 import AdminLeaderboard from './components/AdminLeaderboard';
 import EmailService from './components/EmailService';
+import { API_BASE_URL } from './utils/constants';
 
 function AppWithRouter() {
   const navigate = useNavigate();
@@ -122,17 +123,12 @@ function AppWithRouter() {
 
   const handleDeleteQuiz = async (quizId) => {
     try {
-      const BASE_URL = 'http://localhost:8080';
-      await fetch(`${BASE_URL}/api/quizzes/${quizId}`, {
+      await fetch(`${API_BASE_URL}/quizzes/${quizId}`, {
         method: 'DELETE'
       });
       
-      // Also remove from localStorage
-      const quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-      const updatedQuizzes = quizzes.filter(quiz => quiz.id !== quizId);
-      localStorage.setItem('quizzes', JSON.stringify(updatedQuizzes));
-      
       setQuizListKey(prevKey => prevKey + 1);
+      window.dispatchEvent(new Event('quizzesUpdated'));
     } catch (error) {
       console.error('Error deleting quiz:', error);
       alert('Failed to delete quiz. Please try again.');
