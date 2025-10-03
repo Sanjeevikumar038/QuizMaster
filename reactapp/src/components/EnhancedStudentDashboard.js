@@ -155,16 +155,15 @@ const EnhancedStudentDashboard = ({ onSelectQuiz, onViewMyResults, onLeaderboard
           })
       );
       
-      // Get recent attempts (last 5) for display
-      const recentAttempts = allAttempts
-        .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
-        .slice(0, 5);
+      // Sort all attempts by date for proper tracking
+      const sortedAttempts = allAttempts
+        .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
 
       setStudentStats({
         totalQuizzes: quizzes.length,
         completedQuizzes: completedQuizIds.length,
         averageScore,
-        recentAttempts: allAttempts // Store all attempts for checking
+        recentAttempts: sortedAttempts // Store all attempts for checking
       });
 
       // Load question counts for each quiz
