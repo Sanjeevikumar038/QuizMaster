@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ModernUI.css';
+import { API_BASE_URL } from '../utils/constants';
 
 const Login = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({ username: '', password: '', email: '' });
@@ -19,7 +20,7 @@ const Login = ({ onLogin }) => {
   
   const fetchStudents = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/students');
+      const response = await fetch(`${API_BASE_URL}/students`);
       const studentsData = await response.json();
       console.log('Fetched students from database:', studentsData);
       setStudents(studentsData);
@@ -95,7 +96,7 @@ const Login = ({ onLogin }) => {
       
       // Create student in database
       try {
-        const response = await fetch('http://localhost:8080/api/students', {
+        const response = await fetch(`${API_BASE_URL}/students`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -115,7 +116,7 @@ const Login = ({ onLogin }) => {
           window.dispatchEvent(new Event('userRegistered'));
           
           // Create session in database
-          const sessionResponse = await fetch('http://localhost:8080/api/sessions/login', {
+          const sessionResponse = await fetch(`${API_BASE_URL}/sessions/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: credentials.username, userRole: 'student' })
@@ -171,7 +172,7 @@ const Login = ({ onLogin }) => {
       }
       
       // Create session in database
-      const sessionResponse = await fetch('http://localhost:8080/api/sessions/login', {
+      const sessionResponse = await fetch(`${API_BASE_URL}/sessions/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: credentials.username, userRole: 'student' })
@@ -199,7 +200,7 @@ const Login = ({ onLogin }) => {
 
     if (adminCredentials.username === 'admin' && adminCredentials.password === 'admin123') {
       // Create admin session in database
-      const sessionResponse = await fetch('http://localhost:8080/api/sessions/login', {
+      const sessionResponse = await fetch(`${API_BASE_URL}/sessions/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'admin', userRole: 'admin' })
