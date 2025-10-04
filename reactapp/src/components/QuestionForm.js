@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../utils/constants';
+import { showNotification } from './NotificationSystem';
 
 const QuestionForm = ({ quizId, onQuestionAdded }) => {
   const [questionText, setQuestionText] = useState('');
@@ -85,6 +86,7 @@ await axios.post(
 newQuestion
 );
 setMessage('Question added!');
+showNotification('question', `❓ Question added successfully!`, 3000);
 setQuestionText('');
 setOptions(
 questionType === 'TRUE_FALSE'
@@ -141,6 +143,7 @@ try {
 } catch (localErr) {
   const apiErrors = err.response?.data?.errors || ['An unexpected error occurred.'];
   setMessage(Array.isArray(apiErrors) ? apiErrors.join(', ') : apiErrors.toString());
+  showNotification('error', '❌ Failed to add question. Please try again.', 4000);
 }
 }
 };

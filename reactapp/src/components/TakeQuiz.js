@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
 import { API_BASE_URL } from '../utils/constants';
+import { showNotification } from './NotificationSystem';
 
 const TakeQuiz = ({ quizId, onQuizCompleted }) => {
     const [quiz, setQuiz] = useState(null);
@@ -243,6 +244,35 @@ axios.post(`${API_BASE_URL}/quiz-attempts`, quizAttemptData)
 console.log('Quiz submission successful:', result.data);
 console.log('Response status:', result.status);
 
+// Calculate and show leaderboard position
+try {
+  const leaderboardResponse = await fetch(`${API_BASE_URL}/quiz-attempts`);
+  const allAttempts = await leaderboardResponse.json();
+  
+  // Calculate student rankings for this quiz
+  const quizAttempts = allAttempts
+    .filter(attempt => (attempt.quizId || attempt.quiz?.id) === quiz.id)
+    .map(attempt => ({
+      ...attempt,
+      percentage: (attempt.score / attempt.totalQuestions) * 100
+    }))
+    .sort((a, b) => b.percentage - a.percentage);
+  
+  const studentRank = quizAttempts.findIndex(attempt => attempt.studentName === studentName) + 1;
+  const totalStudents = quizAttempts.length;
+  const percentage = Math.round((correctAnswers / questions.length) * 100);
+  
+  if (studentRank > 0) {
+    showNotification('rank', `🎯 Quiz completed! You scored ${percentage}% and ranked #${studentRank} out of ${totalStudents} students`, 6000);
+  } else {
+    showNotification('success', `🎯 Quiz completed! You scored ${percentage}%`, 4000);
+  }
+} catch (rankError) {
+  console.error('Error calculating rank:', rankError);
+  const percentage = Math.round((correctAnswers / questions.length) * 100);
+  showNotification('success', `🎯 Quiz completed! You scored ${percentage}%`, 4000);
+}
+
 // Send result email to student
 try {
   // Get student email from database
@@ -264,6 +294,9 @@ try {
       }
     );
     
+    if (emailResult.success) {
+      showNotification('email', '📧 Results sent to your email!', 3000);
+    }
     console.log('Email sent result:', emailResult);
   } else {
     console.log('No email found for student:', studentName);

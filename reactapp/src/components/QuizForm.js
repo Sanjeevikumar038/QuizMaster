@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useToast, ToastContainer } from './Toast';
 import { API_BASE_URL } from '../utils/constants';
+import { showNotification } from './NotificationSystem';
 
 const QuizForm = ({ onQuizCreated }) => {
   const [title, setTitle] = useState('');
@@ -37,6 +38,7 @@ try {
 const newQuiz = { title, description, timeLimit: parseInt(timeLimit) };
 await axios.post(`${API_BASE_URL}/quizzes`, newQuiz);
 addToast('Quiz created successfully!', 'success');
+showNotification('quiz', `📝 Quiz "${title}" created successfully!`, 4000);
 setTitle('');
 setDescription('');
 setTimeLimit('');
@@ -44,6 +46,7 @@ setErrors({});
 onQuizCreated();
 } catch (err) {
 addToast('Failed to create quiz. Please try again.', 'error');
+showNotification('error', '❌ Failed to create quiz. Please try again.', 4000);
 }
 };
 

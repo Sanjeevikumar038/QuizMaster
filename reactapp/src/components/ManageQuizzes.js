@@ -3,6 +3,7 @@ import axios from 'axios';
 import { buttonStyles } from './buttonStyles';
 import { handleApiError } from './errorHandler';
 import { API_BASE_URL } from '../utils/constants';
+import { showNotification } from './NotificationSystem';
 
 const ManageQuizzes = () => {
   const [quizzes, setQuizzes] = useState([]);
@@ -41,12 +42,15 @@ const ManageQuizzes = () => {
     if (!window.confirm('Are you sure you want to delete this quiz?')) return;
     
     try {
+      const quizToDelete = quizzes.find(q => q.id === quizId);
       await axios.delete(`${API_BASE_URL}/quizzes/${quizId}`);
       setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
+      showNotification('success', `🗑️ Quiz "${quizToDelete?.title}" deleted successfully!`, 3000);
       // Notify other components that quizzes were updated
       window.dispatchEvent(new Event('quizzesUpdated'));
     } catch (err) {
       setError(handleApiError(err, 'Failed to delete quiz'));
+      showNotification('error', '❌ Failed to delete quiz. Please try again.', 4000);
     }
   };
 

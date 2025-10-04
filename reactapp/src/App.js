@@ -16,6 +16,7 @@ import AllStudentResults from './components/AllStudentResults';
 import UserAccounts from './components/UserAccounts';
 import AdminLeaderboard from './components/AdminLeaderboard';
 import EmailService from './components/EmailService';
+import NotificationSystem from './components/NotificationSystem';
 import { API_BASE_URL } from './utils/constants';
 
 function AppWithRouter() {
@@ -229,6 +230,7 @@ function AppWithRouter() {
 
   return (
     <div className="App">
+      <NotificationSystem />
       {view !== 'take-quiz' && (
         <header className="App-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0 }}>QuizMaster</h1>
