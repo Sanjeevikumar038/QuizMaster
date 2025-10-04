@@ -45,7 +45,7 @@ class EmailService {
       quiz_url: window.location.origin
     };
 
-    return this.sendEmail(this.templateIds.quizReminder, templateParams);
+    return this.sendEmail(this.templateIds.quizReminder, templateParams, 'reminder');
   }
 
   // Send quiz results email
@@ -92,22 +92,28 @@ class EmailService {
 
   async sendNewQuizNotification(quizData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/emails/send-reminders/${quizData.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      // Fetch students from database
+      const response = await fetch(`${API_BASE_URL}/students`);
+      const students = await response.json();
+      const studentsWithEmail = students.filter(student => student.email);
       
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log(`Sent reminders to ${result.count} students`);
-        return result;
-      } else {
-        console.error('Failed to send reminders:', result.message);
-        return { success: false, message: result.message };
+      if (studentsWithEmail.length === 0) {
+        return { success: false, message: 'No students with email addresses found' };
       }
+      
+      // Send emails using EmailJS directly
+      const emailPromises = studentsWithEmail.map(student => 
+        this.sendQuizReminder(student.email, quizData)
+      );
+      
+      const results = await Promise.allSettled(emailPromises);
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      
+      return {
+        success: true,
+        count: successful,
+        message: `Sent ${successful} reminder emails`
+      };
     } catch (error) {
       console.error('Error sending reminders:', error);
       return { success: false, message: error.message };
@@ -121,7 +127,7 @@ class EmailService {
         // Fallback to demo mode
         console.log('Demo mode - Email would be sent:', { templateId, templateParams });
         await this.logEmailSent(templateParams.to_email, emailType);
-        return { success: true, message: 'Email sent (demo mode)' };
+        return { success: true, message: 'Email logged (EmailJS not configured)', demo: true };
       }
 
       // Real EmailJS sending

@@ -139,9 +139,12 @@ const ModernQuizCreation = ({ onQuizCreated }) => {
           const emailResult = await EmailService.sendNewQuizNotification(newQuiz);
           if (emailResult.success) {
             showNotification('email', `📧 Reminder emails sent to ${emailResult.count} students!`, 4000);
+          } else {
+            showNotification('error', `❌ ${emailResult.message}`, 4000);
           }
         } catch (emailError) {
           console.error('Failed to send reminder emails:', emailError);
+          showNotification('error', '❌ Failed to send reminder emails', 4000);
         }
         
         setQuiz({ title: '', description: '', duration: 30, questions: [] });
