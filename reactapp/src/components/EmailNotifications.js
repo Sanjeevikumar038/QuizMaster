@@ -15,6 +15,8 @@ const EmailNotifications = () => {
   const [quizzes, setQuizzes] = useState([]);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadData();
@@ -22,16 +24,23 @@ const EmailNotifications = () => {
 
   const loadData = async () => {
     try {
-      // Fetch quizzes from database
-      const quizzesResponse = await fetch(`${API_BASE_URL}/quiz`);
-      const quizzesData = await quizzesResponse.json();
-      setQuizzes(quizzesData);
+      setLoading(true);
+      setError('');
       
-      // Fetch email stats from database
+      const quizzesResponse = await fetch(`${API_BASE_URL}/quizzes`);
+      if (!quizzesResponse.ok) {
+        throw new Error(`Failed to fetch quizzes: ${quizzesResponse.status}`);
+      }
+      const quizzesData = await quizzesResponse.json();
+      setQuizzes(Array.isArray(quizzesData) ? quizzesData : []);
+      
       const stats = await EmailService.getEmailStats();
       setEmailStats(stats);
     } catch (error) {
       console.error('Error loading data:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,7 +60,7 @@ const EmailNotifications = () => {
       
       if (result.success) {
         setMessage(`✅ Sent ${result.count} reminder emails successfully!`);
-        await loadData(); // Reload data to update stats
+        await loadData();
       } else {
         setMessage(`❌ ${result.message}`);
       }
@@ -69,6 +78,60 @@ const EmailNotifications = () => {
 
   const reminderEmails = emailStats.recentReminders || [];
   const resultEmails = emailStats.recentResults || [];
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#f1f5f9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+          <div>Loading email management...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#f1f5f9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ 
+          textAlign: 'center',
+          backgroundColor: 'white',
+          padding: '2rem',
+          borderRadius: '12px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem', color: '#dc2626' }}>❌</div>
+          <div style={{ color: '#dc2626', fontWeight: '600', marginBottom: '1rem' }}>Error Loading Email Management</div>
+          <div style={{ color: '#6b7280', marginBottom: '1rem' }}>{error}</div>
+          <button 
+            onClick={loadData}
+            style={{
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '0.75rem 1.5rem',
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -171,7 +234,81 @@ const EmailNotifications = () => {
           </div>
         </div>
 
-        {/* Send Reminder Section */}
+        {/* Automatic Email Info */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          border: '2px solid #dbeafe'
+        }}>
+          <h2 style={{
+            fontSize: '1.5rem',
+            fontWeight: '600',
+            color: '#1e293b',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            🤖 Automatic Email System
+          </h2>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '1.5rem'
+          }}>
+            <div style={{
+              padding: '1.5rem',
+              backgroundColor: '#f0fdf4',
+              borderRadius: '12px',
+              border: '1px solid #bbf7d0'
+            }}>
+              <div style={{
+                fontSize: '1.5rem',
+                marginBottom: '0.5rem'
+              }}>📧</div>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                color: '#166534',
+                marginBottom: '0.5rem'
+              }}>Reminder Emails</h3>
+              <p style={{
+                color: '#166534',
+                fontSize: '0.875rem',
+                margin: 0
+              }}>Automatically sent to all students when new quizzes are created</p>
+            </div>
+            
+            <div style={{
+              padding: '1.5rem',
+              backgroundColor: '#eff6ff',
+              borderRadius: '12px',
+              border: '1px solid #bfdbfe'
+            }}>
+              <div style={{
+                fontSize: '1.5rem',
+                marginBottom: '0.5rem'
+              }}>📊</div>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                color: '#1e40af',
+                marginBottom: '0.5rem'
+              }}>Result Emails</h3>
+              <p style={{
+                color: '#1e40af',
+                fontSize: '0.875rem',
+                margin: 0
+              }}>Automatically sent to students when they complete quizzes</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Manual Send Reminder Section */}
         <div style={{
           backgroundColor: 'white',
           borderRadius: '16px',
@@ -183,10 +320,15 @@ const EmailNotifications = () => {
             fontSize: '1.5rem',
             fontWeight: '600',
             color: '#1e293b',
-            marginBottom: '1.5rem'
+            marginBottom: '0.5rem'
           }}>
-            ⏰ Send Quiz Reminder
+            ⏰ Manual Reminder
           </h2>
+          <p style={{
+            color: '#6b7280',
+            fontSize: '0.875rem',
+            marginBottom: '1.5rem'
+          }}>Send additional reminders for existing quizzes</p>
           
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
@@ -215,7 +357,7 @@ const EmailNotifications = () => {
               onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
             >
               <option value="">Choose a quiz...</option>
-              {quizzes.map(quiz => (
+              {Array.isArray(quizzes) && quizzes.map(quiz => (
                 <option key={quiz.id} value={quiz.id}>{quiz.title}</option>
               ))}
             </select>
@@ -249,7 +391,7 @@ const EmailNotifications = () => {
               }
             }}
           >
-            {sending ? '⏳ Sending...' : '📤 Send Reminder'}
+            {sending ? '⏳ Sending...' : '📤 Send Additional Reminder'}
           </button>
 
           {message && (

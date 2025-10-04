@@ -90,7 +90,6 @@ class EmailService {
     return result;
   }
 
-  // Send new quiz notification to all students
   async sendNewQuizNotification(quizData) {
     try {
       const response = await fetch(`${API_BASE_URL}/emails/send-reminders/${quizData.id}`, {
@@ -188,7 +187,6 @@ class EmailService {
     }
   }
 
-  // Get email sending history from database
   async getEmailStats() {
     try {
       const response = await fetch(`${API_BASE_URL}/emails/stats`);

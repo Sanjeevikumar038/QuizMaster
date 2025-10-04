@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useToast, ToastContainer } from './Toast';
 import { API_BASE_URL } from '../utils/constants';
 import { showNotification } from './NotificationSystem';
+import EmailService from './EmailService';
 
 const QuizForm = ({ onQuizCreated }) => {
   const [title, setTitle] = useState('');
@@ -36,9 +37,22 @@ const QuizForm = ({ onQuizCreated }) => {
 
 try {
 const newQuiz = { title, description, timeLimit: parseInt(timeLimit) };
-await axios.post(`${API_BASE_URL}/quizzes`, newQuiz);
+const response = await axios.post(`${API_BASE_URL}/quizzes`, newQuiz);
+const createdQuiz = response.data;
+
 addToast('Quiz created successfully!', 'success');
 showNotification('quiz', `Quiz "${title}" created successfully!`, 4000);
+
+// Send reminder emails to all students
+try {
+  const emailResult = await EmailService.sendNewQuizNotification(createdQuiz);
+  if (emailResult.success) {
+    showNotification('email', `📧 Reminder emails sent to ${emailResult.count} students!`, 4000);
+  }
+} catch (emailError) {
+  console.error('Failed to send reminder emails:', emailError);
+}
+
 setTitle('');
 setDescription('');
 setTimeLimit('');

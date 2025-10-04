@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './ModernUI.css';
+import EmailService from './EmailService';
+import { showNotification } from './NotificationSystem';
 
 const ModernQuizCreation = ({ onQuizCreated }) => {
   const [quiz, setQuiz] = useState({
@@ -131,6 +133,17 @@ const ModernQuizCreation = ({ onQuizCreated }) => {
         }
         
         setMessage('Quiz created successfully!');
+        
+        // Send reminder emails to all students
+        try {
+          const emailResult = await EmailService.sendNewQuizNotification(newQuiz);
+          if (emailResult.success) {
+            showNotification('email', `📧 Reminder emails sent to ${emailResult.count} students!`, 4000);
+          }
+        } catch (emailError) {
+          console.error('Failed to send reminder emails:', emailError);
+        }
+        
         setQuiz({ title: '', description: '', duration: 30, questions: [] });
         setSelectedQuestions([]);
         
