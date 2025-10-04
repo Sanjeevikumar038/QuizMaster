@@ -38,7 +38,7 @@ try {
 const newQuiz = { title, description, timeLimit: parseInt(timeLimit) };
 await axios.post(`${API_BASE_URL}/quizzes`, newQuiz);
 addToast('Quiz created successfully!', 'success');
-showNotification('quiz', `📝 Quiz "${title}" created successfully!`, 4000);
+showNotification('quiz', `Quiz "${title}" created successfully!`, 4000);
 setTitle('');
 setDescription('');
 setTimeLimit('');
@@ -46,7 +46,7 @@ setErrors({});
 onQuizCreated();
 } catch (err) {
 addToast('Failed to create quiz. Please try again.', 'error');
-showNotification('error', '❌ Failed to create quiz. Please try again.', 4000);
+showNotification('error', 'Failed to create quiz. Please try again.', 4000);
 }
 };
 

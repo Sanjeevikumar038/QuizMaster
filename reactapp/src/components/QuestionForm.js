@@ -86,7 +86,7 @@ await axios.post(
 newQuestion
 );
 setMessage('Question added!');
-showNotification('question', `❓ Question added successfully!`, 3000);
+showNotification('question', `Question added successfully!`, 3000);
 setQuestionText('');
 setOptions(
 questionType === 'TRUE_FALSE'
