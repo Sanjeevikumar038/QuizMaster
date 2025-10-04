@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import EmailService from './EmailService';
+import { API_BASE_URL } from '../utils/constants';
 
 const EmailNotifications = () => {
-  const [emailHistory, setEmailHistory] = useState([]);
+  const [emailStats, setEmailStats] = useState({
+    remindersSent: 0,
+    resultsSent: 0,
+    activeStudents: 0,
+    totalEmails: 0,
+    recentReminders: [],
+    recentResults: []
+  });
   const [selectedQuiz, setSelectedQuiz] = useState('');
   const [quizzes, setQuizzes] = useState([]);
-  const [students, setStudents] = useState([]);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -13,14 +20,19 @@ const EmailNotifications = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const savedQuizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-    const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
-    const history = EmailService.getEmailHistory();
-    
-    setQuizzes(savedQuizzes);
-    setStudents(savedStudents);
-    setEmailHistory(history);
+  const loadData = async () => {
+    try {
+      // Fetch quizzes from database
+      const quizzesResponse = await fetch(`${API_BASE_URL}/quiz`);
+      const quizzesData = await quizzesResponse.json();
+      setQuizzes(quizzesData);
+      
+      // Fetch email stats from database
+      const stats = await EmailService.getEmailStats();
+      setEmailStats(stats);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
   const sendQuizReminders = async () => {
@@ -33,25 +45,19 @@ const EmailNotifications = () => {
     setMessage('Sending reminders...');
 
     const quiz = quizzes.find(q => q.id.toString() === selectedQuiz);
-    const studentsWithEmail = students.filter(student => student.email);
     
-    if (studentsWithEmail.length === 0) {
-      setMessage('No students with email addresses found');
-      setSending(false);
-      return;
-    }
-    
-    const emailPromises = studentsWithEmail.map(student => 
-      EmailService.sendQuizReminder(student.email, quiz)
-    );
-
     try {
-      const results = await Promise.allSettled(emailPromises);
-      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-      setMessage(`✅ Sent ${successful} reminder emails successfully!`);
-      loadData();
+      const result = await EmailService.sendNewQuizNotification(quiz);
+      
+      if (result.success) {
+        setMessage(`✅ Sent ${result.count} reminder emails successfully!`);
+        await loadData(); // Reload data to update stats
+      } else {
+        setMessage(`❌ ${result.message}`);
+      }
     } catch (error) {
       setMessage('❌ Failed to send reminders');
+      console.error('Error sending reminders:', error);
     } finally {
       setSending(false);
     }
@@ -61,8 +67,8 @@ const EmailNotifications = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  const reminderEmails = emailHistory.filter(e => e.type === 'reminder');
-  const resultEmails = emailHistory.filter(e => e.type === 'results');
+  const reminderEmails = emailStats.recentReminders || [];
+  const resultEmails = emailStats.recentResults || [];
 
   return (
     <div style={{
@@ -117,7 +123,7 @@ const EmailNotifications = () => {
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏰</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6' }}>
-              {reminderEmails.length}
+              {emailStats.remindersSent}
             </div>
             <div style={{ color: '#64748b', fontSize: '0.875rem' }}>Reminders Sent</div>
           </div>
@@ -131,7 +137,7 @@ const EmailNotifications = () => {
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📊</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>
-              {resultEmails.length}
+              {emailStats.resultsSent}
             </div>
             <div style={{ color: '#64748b', fontSize: '0.875rem' }}>Results Sent</div>
           </div>
@@ -145,7 +151,7 @@ const EmailNotifications = () => {
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👥</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#8b5cf6' }}>
-              {students.filter(s => s.email).length}
+              {emailStats.activeStudents}
             </div>
             <div style={{ color: '#64748b', fontSize: '0.875rem' }}>Active Students</div>
           </div>
@@ -159,7 +165,7 @@ const EmailNotifications = () => {
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📧</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#f59e0b' }}>
-              {emailHistory.length}
+              {emailStats.totalEmails}
             </div>
             <div style={{ color: '#64748b', fontSize: '0.875rem' }}>Total Emails</div>
           </div>
@@ -292,7 +298,7 @@ const EmailNotifications = () => {
                 padding: '0.25rem 0.5rem',
                 borderRadius: '12px'
               }}>
-                {reminderEmails.length}
+                {emailStats.remindersSent}
               </span>
             </h3>
             
@@ -371,7 +377,7 @@ const EmailNotifications = () => {
                 padding: '0.25rem 0.5rem',
                 borderRadius: '12px'
               }}>
-                {resultEmails.length}
+                {emailStats.resultsSent}
               </span>
             </h3>
             

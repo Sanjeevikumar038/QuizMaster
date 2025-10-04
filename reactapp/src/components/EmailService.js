@@ -66,44 +66,53 @@ class EmailService {
       completion_date: new Date().toLocaleDateString()
     };
 
-    return this.sendEmail(this.templateIds.quizResults, templateParams, 'results');
+    const result = await this.sendEmail(this.templateIds.quizResults, templateParams, 'results');
+    
+    // Log result email to database
+    if (result.success) {
+      try {
+        await fetch(`${API_BASE_URL}/emails/log-result`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: studentEmail,
+            quizId: quizData.id,
+            quizTitle: quizData.title
+          })
+        });
+      } catch (error) {
+        console.error('Failed to log result email:', error);
+      }
+    }
+    
+    return result;
   }
 
   // Send new quiz notification to all students
   async sendNewQuizNotification(quizData) {
-    let studentsWithEmail = [];
-    
     try {
-      // Fetch students from database instead of localStorage
-      const response = await fetch(`${API_BASE_URL}/students`);
-      const students = await response.json();
-      studentsWithEmail = students.filter(student => student.email);
+      const response = await fetch(`${API_BASE_URL}/emails/send-reminders/${quizData.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
-      console.log('Found students with emails:', studentsWithEmail);
+      const result = await response.json();
       
-      if (studentsWithEmail.length === 0) {
-        console.log('No students with email addresses found');
-        return [];
+      if (result.success) {
+        console.log(`Sent reminders to ${result.count} students`);
+        return result;
+      } else {
+        console.error('Failed to send reminders:', result.message);
+        return { success: false, message: result.message };
       }
     } catch (error) {
-      console.error('Error fetching students from database:', error);
-      return [];
+      console.error('Error sending reminders:', error);
+      return { success: false, message: error.message };
     }
-    
-    const emailPromises = studentsWithEmail.map(student => {
-      const templateParams = {
-        to_email: student.email,
-        student_name: student.username,
-        quiz_title: quizData.title,
-        quiz_description: quizData.description,
-        time_limit: quizData.timeLimit,
-        quiz_url: window.location.origin
-      };
-      
-      return this.sendEmail(this.templateIds.quizReminder, templateParams, 'reminder');
-    });
-
-    return Promise.allSettled(emailPromises);
   }
 
   // Generic email sending method
@@ -112,7 +121,7 @@ class EmailService {
       if (!this.initialized) {
         // Fallback to demo mode
         console.log('Demo mode - Email would be sent:', { templateId, templateParams });
-        this.logEmailSent(templateParams.to_email, emailType);
+        await this.logEmailSent(templateParams.to_email, emailType);
         return { success: true, message: 'Email sent (demo mode)' };
       }
 
@@ -125,7 +134,7 @@ class EmailService {
       );
       
       console.log('Email sent successfully:', result);
-      this.logEmailSent(templateParams.to_email, emailType);
+      await this.logEmailSent(templateParams.to_email, emailType);
       return { success: true, message: 'Email sent successfully', result };
       
     } catch (error) {
@@ -159,20 +168,42 @@ class EmailService {
     return 'F';
   }
 
-  logEmailSent(email, type) {
-    const emailLogs = JSON.parse(localStorage.getItem('emailLogs') || '[]');
-    emailLogs.push({
-      email,
-      type,
-      timestamp: new Date().toISOString(),
-      status: 'sent'
-    });
-    localStorage.setItem('emailLogs', JSON.stringify(emailLogs));
+  async logEmailSent(email, type, quizId = null, quizTitle = null) {
+    try {
+      await fetch(`${API_BASE_URL}/emails/log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          type,
+          quizId,
+          quizTitle,
+          status: 'sent'
+        })
+      });
+    } catch (error) {
+      console.error('Failed to log email:', error);
+    }
   }
 
-  // Get email sending history
-  getEmailHistory() {
-    return JSON.parse(localStorage.getItem('emailLogs') || '[]');
+  // Get email sending history from database
+  async getEmailStats() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/emails/stats`);
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch email stats:', error);
+      return {
+        remindersSent: 0,
+        resultsSent: 0,
+        activeStudents: 0,
+        totalEmails: 0,
+        recentReminders: [],
+        recentResults: []
+      };
+    }
   }
 }
 

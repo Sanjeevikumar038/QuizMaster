@@ -6,22 +6,35 @@ const QuizResults = ({ attempt, onReturnHome }) => {
     
     // Send email when results are displayed
     useEffect(() => {
-        if (attempt && attempt.studentName && !emailSent.current) {
-            const students = JSON.parse(localStorage.getItem('students') || '[]');
-            const student = students.find(s => s.username === attempt.studentName);
-            
-            if (student && student.email) {
-                const quizData = { title: attempt.quizTitle || 'Quiz' };
-                const results = {
-                    score: attempt.score,
-                    totalQuestions: attempt.totalQuestions,
-                    timeTaken: attempt.timeTaken
-                };
-                
-                EmailService.sendQuizResults(student.email, quizData, results);
-                emailSent.current = true;
+        const sendResultEmail = async () => {
+            if (attempt && attempt.studentName && !emailSent.current) {
+                try {
+                    // Fetch student from database
+                    const response = await fetch(`http://localhost:8080/api/students`);
+                    const students = await response.json();
+                    const student = students.find(s => s.username === attempt.studentName);
+                    
+                    if (student && student.email) {
+                        const quizData = { 
+                            id: attempt.quizId,
+                            title: attempt.quizTitle || 'Quiz' 
+                        };
+                        const results = {
+                            score: attempt.score,
+                            totalQuestions: attempt.totalQuestions,
+                            timeTaken: attempt.timeTaken
+                        };
+                        
+                        await EmailService.sendQuizResults(student.email, quizData, results);
+                        emailSent.current = true;
+                    }
+                } catch (error) {
+                    console.error('Error sending result email:', error);
+                }
             }
-        }
+        };
+        
+        sendResultEmail();
     }, [attempt]);
 
     if (!attempt) {
